@@ -22,7 +22,7 @@ func is_only_letters(s string) bool {
 
 func main(){
 	
-	// host_os := runtime.GOOS
+	host_os := runtime.GOOS
 	arch := runtime.GOARCH
 	
 	// used to format to get only the number in 'intelXX' or 'amdXX'
@@ -31,7 +31,7 @@ func main(){
 	} 
 
 
-	fmt.Printf("%T\n", arch)
+	fmt.Println(host_os)
 
 	// binaries := map[Platform]string {
 	// 	{OS: "windows", Arch:"64"} : "WINDOWS - x64",
