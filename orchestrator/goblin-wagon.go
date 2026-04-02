@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"runtime"
+	// "runtime"
 	"unicode"
 )
 
@@ -21,24 +21,25 @@ func is_only_letters(s string) bool {
 }
 
 func main(){
-	host_os := runtime.GOARCH
-	arch := runtime.GOARCH
+	fmt.Println(is_only_letters("arm"))
+	// host_os := runtime.GOOS
+	// arch := runtime.GOARCH
 	
-	// used to format to get only the number in 'intelXX' or 'amdXX'
-	if !is_only_letters(arch){
-		arch = arch[len(arch)-2:]
-	} 
+	// // used to format to get only the number in 'intelXX' or 'amdXX'
+	// if !is_only_letters(arch){
+	// 	arch = arch[len(arch)-2:]
+	// } 
 	
 
-	binaries := map[Platform]string {
-		{OS: "windows", Arch:"64"} : "WINDOWS - x64",
-		{OS: "windows", Arch:"86"} : "WINDOWS - x86",
-		{OS: "windows", Arch:"arm"} : "WINDOWS - ARM",
-		{OS: "linux", Arch:"64"} : "LINUX - x64",
-		{OS: "linux", Arch:"86"} : "LINUX - x86",
-		{OS: "windows", Arch:"arm"} : "LINUX - ARM",
-	}
+	// binaries := map[Platform]string {
+	// 	{OS: "windows", Arch:"64"} : "WINDOWS - x64",
+	// 	{OS: "windows", Arch:"86"} : "WINDOWS - x86",
+	// 	{OS: "windows", Arch:"arm"} : "WINDOWS - ARM",
+	// 	{OS: "linux", Arch:"64"} : "LINUX - x64",
+	// 	{OS: "linux", Arch:"86"} : "LINUX - x86",
+	// 	{OS: "linux", Arch:"arm"} : "LINUX - ARM",
+	// }
 
-	fmt.Println(binaries[Platform{OS: host_os, Arch: arch}])
+	// fmt.Println(binaries[Platform{OS: host_os, Arch: arch}])
 
 }
