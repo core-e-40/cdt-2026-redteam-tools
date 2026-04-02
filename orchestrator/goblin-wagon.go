@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	// "runtime"
+	"runtime"
 	"unicode"
 )
 
@@ -21,15 +21,17 @@ func is_only_letters(s string) bool {
 }
 
 func main(){
-	fmt.Println(is_only_letters("arm"))
+	
 	// host_os := runtime.GOOS
-	// arch := runtime.GOARCH
+	arch := runtime.GOARCH
 	
-	// // used to format to get only the number in 'intelXX' or 'amdXX'
-	// if !is_only_letters(arch){
-	// 	arch = arch[len(arch)-2:]
-	// } 
-	
+	// used to format to get only the number in 'intelXX' or 'amdXX'
+	if !is_only_letters(arch){
+		arch = arch[len(arch)-2:]
+	} 
+
+
+	fmt.Println(arch)
 
 	// binaries := map[Platform]string {
 	// 	{OS: "windows", Arch:"64"} : "WINDOWS - x64",
