@@ -31,17 +31,15 @@ func main(){
 	} 
 
 
-	fmt.Println(host_os)
+	binaries := map[Platform]string {
+		{OS: "windows", Arch:"64"} : "WINDOWS - x64",
+		{OS: "windows", Arch:"86"} : "WINDOWS - x86",
+		{OS: "windows", Arch:"arm"} : "WINDOWS - ARM",
+		{OS: "linux", Arch:"64"} : "LINUX - x64",
+		{OS: "linux", Arch:"86"} : "LINUX - x86",
+		{OS: "linux", Arch:"arm"} : "LINUX - ARM",
+	}
 
-	// binaries := map[Platform]string {
-	// 	{OS: "windows", Arch:"64"} : "WINDOWS - x64",
-	// 	{OS: "windows", Arch:"86"} : "WINDOWS - x86",
-	// 	{OS: "windows", Arch:"arm"} : "WINDOWS - ARM",
-	// 	{OS: "linux", Arch:"64"} : "LINUX - x64",
-	// 	{OS: "linux", Arch:"86"} : "LINUX - x86",
-	// 	{OS: "linux", Arch:"arm"} : "LINUX - ARM",
-	// }
-
-	// fmt.Println(binaries[Platform{OS: host_os, Arch: arch}])
+	fmt.Println(binaries[Platform{OS: host_os, Arch: arch}])
 
 }
