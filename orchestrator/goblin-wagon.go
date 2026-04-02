@@ -30,7 +30,9 @@ func main(){
 		arch = arch[len(arch)-2:]
 	} 
 
-
+	/*
+	COME BACK HERE WHEN WAGON IS DONE TO EMBED EXEs INTO DICT
+	*/
 	binaries := map[Platform]string {
 		{OS: "windows", Arch:"64"} : "WINDOWS - x64",
 		{OS: "windows", Arch:"86"} : "WINDOWS - x86",
