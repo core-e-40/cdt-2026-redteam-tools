@@ -31,7 +31,7 @@ func main(){
 	} 
 
 
-	fmt.Println(arch)
+	fmt.Printf("%T\n", arch)
 
 	// binaries := map[Platform]string {
 	// 	{OS: "windows", Arch:"64"} : "WINDOWS - x64",
