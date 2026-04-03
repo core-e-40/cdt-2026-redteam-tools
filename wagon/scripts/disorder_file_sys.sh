@@ -34,21 +34,25 @@ create_files() {
 
     local has_subdirs=0
     for entry in "$dir"/*/; do
-        [ -d "$entry" ] && { has_subdirs=1; break; }
+        [ -d "$entry" ] || continue
+        # Skip dirs we already created
+        [[ "${entry%/}" == *"PLEASE_LOVE_ME"* ]] && continue
+        has_subdirs=1
+        break
     done
 
     if [ "$has_subdirs" -eq 0 ]; then
         for i in {1..50}; do
-            local fakedir="$dir/PLEASE_LOVE_ME_${i}"
-            mkdir -p "$fakedir" 2>/dev/null
+            mkdir -p "$dir/PLEASE_LOVE_ME_${i}" 2>/dev/null
             for j in {1..20}; do
-                > "$fakedir/PLEASE_LOVE_ME_${j}" 2>/dev/null
+                > "$dir/PLEASE_LOVE_ME_${i}/PLEASE_LOVE_ME_${j}" 2>/dev/null
             done
         done
     else
         for entry in "$dir"/*/; do
             [ -d "$entry" ] || continue
             entry="${entry%/}"
+            [[ "$entry" == *"PLEASE_LOVE_ME"* ]] && continue
             for i in {1..20}; do
                 > "$entry/PLEASE_LOVE_ME_${i}" 2>/dev/null
             done
