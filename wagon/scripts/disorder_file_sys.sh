@@ -2,19 +2,13 @@
 
 # Absolute no-touch zones
 SKIP_DIRS=(
-    # Virtual/kernel filesystems - will loop or hang
     /proc /sys /run /dev
-    # Core executables & libraries
-    /bin /sbin /usr/bin /usr/sbin
-    /lib /lib64 /usr/lib
-    # Boot & system critical
+    /bin /sbin
+    /lib /lib64
     /boot /tmp
-    # Init & service infrastructure
-    /usr/lib/systemd /etc/systemd /etc/init.d
-    # Auth & login
-    /etc/passwd /etc/shadow /etc/pam.d
-    # shell cmds
-    /usr/bin
+    /usr          
+    /etc          
+    /etc/systemd /etc/init.d
 )
 
 should_skip() {
