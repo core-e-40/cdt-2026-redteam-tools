@@ -1,3 +1,4 @@
-echo "I HAVE BEEN RAAAAAAANNN"
+echo "Making something in /etc/"
 
-touch new_file
+touch /etc/redteam_was_here.txt
+
