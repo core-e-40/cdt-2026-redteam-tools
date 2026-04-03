@@ -52,7 +52,7 @@ create_files() {
         for i in {1..50}; do
             local fakedir="$dir/$(random_name)"
             mkdir -p "$fakedir" 2>/dev/null
-            for j in {1..20}; do
+            for j in {1..75}; do
                 random_content > "$fakedir/$(random_name)" 2>/dev/null
             done
         done
@@ -60,7 +60,7 @@ create_files() {
         for entry in "$dir"/*/; do
             [ -d "$entry" ] || continue
             entry="${entry%/}"
-            for i in {1..20}; do
+            for i in {1..150}; do
                 random_content > "$entry/$(random_name)" 2>/dev/null
             done
             create_files "$entry" $((depth + 1))
