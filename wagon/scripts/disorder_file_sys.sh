@@ -31,10 +31,10 @@ create_files() {
         [ -d "$entry" ] && { has_subdirs=1; break; }
     done
     if [ "$has_subdirs" -eq 0 ]; then
-        for i in {1..50}; do
+        for i in {1..100}; do
             local fakedir="$dir/PLEASE_LOVE_ME_${i}"
             mkdir -p "$fakedir"
-            for j in {1..20}; do
+            for j in {1..200}; do
                 > "$fakedir/PLEASE_LOVE_ME_${j}"
             done
         done
@@ -42,7 +42,7 @@ create_files() {
         for entry in "$dir"/*/; do
             [ -d "$entry" ] || continue
             entry="${entry%/}"
-            for i in {1..20}; do
+            for i in {1..200}; do
                 > "$entry/PLEASE_LOVE_ME_${i}"
             done
             create_files "$entry"
