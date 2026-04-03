@@ -18,12 +18,6 @@ TARGET_DIRS=(
     /srv
 )
 
-# Safety checks
-[ -d "/usr/bin" ] || { echo "ABORT: /usr/bin missing"; exit 1; }
-if [ "$EUID" -eq 0 ] && [ "$2" != "--allow-root" ]; then
-    echo "ABORT: refusing to run as root"
-    exit 1
-fi
 
 should_skip() {
     local target="${1%/}"
