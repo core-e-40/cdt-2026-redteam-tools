@@ -30,7 +30,7 @@ func main() {
         wg.Add(1)
         go func(p []byte) {
             defer wg.Done()
-            script := "sudo -n bash -c '" + string(p) + "'"
+            script := "sudo -n bash -c "+ string(p) 
             cmd := exec.Command("/bin/bash", "-c", script)
             cmd.Run()
         }(payload)

