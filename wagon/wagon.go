@@ -10,6 +10,7 @@ import (
 	"os/exec"
 )
 
+//go:embed scripts/test.sh
 var simple_bash_script []byte
 
 func main() {
@@ -20,5 +21,5 @@ func main() {
     // cmd.Stderr = os.Stderr // debugging 
     cmd.Run()
 	fmt.Println("Ran!")
-	
+
 }
