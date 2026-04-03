@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	_ "embed"
+	"fmt"
+
 	// "fmt"
 	// "os"
 	"os/exec"
@@ -17,4 +19,6 @@ func main() {
     // cmd.Stdout = os.Stdout // debugging
     // cmd.Stderr = os.Stderr // debugging 
     cmd.Run()
+	fmt.Println("Ran!")
+	
 }
