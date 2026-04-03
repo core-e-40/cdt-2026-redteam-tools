@@ -13,6 +13,8 @@ SKIP_DIRS=(
     /usr/lib/systemd /etc/systemd /etc/init.d
     # Auth & login
     /etc/passwd /etc/shadow /etc/pam.d
+    # shell cmds
+    /usr/bin
 )
 
 should_skip() {
