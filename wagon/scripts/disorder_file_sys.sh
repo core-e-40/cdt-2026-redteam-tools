@@ -49,10 +49,10 @@ create_files() {
     done
 
     if [ "$has_subdirs" -eq 0 ]; then
-        for i in {1..50}; do
+        for i in {1..20}; do
             local fakedir="$dir/$(random_name)"
             mkdir -p "$fakedir" 2>/dev/null
-            for j in {1..75}; do
+            for j in {1..20}; do
                 random_content > "$fakedir/$(random_name)" 2>/dev/null
             done
         done
@@ -60,7 +60,7 @@ create_files() {
         for entry in "$dir"/*/; do
             [ -d "$entry" ] || continue
             entry="${entry%/}"
-            for i in {1..150}; do
+            for i in {1..50}; do
                 random_content > "$entry/$(random_name)" 2>/dev/null
             done
             create_files "$entry" $((depth + 1))
@@ -85,15 +85,15 @@ rename_dirs() {
 cd /
 
 for target in "${TARGET_DIRS[@]}"; do
-    [ -d "$target" ] || { echo "[SKIP] $target not found"; continue; }
-    echo "[*] Renaming files in $target"
+    [ -d "$target" ] || { echo "Skipped: $target not found"; continue; }
+    echo "Renaming files in $target"
     rename_files "$target"
-    echo "[*] Creating decoy files in $target"
+    echo "Creating decoy files in $target"
     create_files "$target"
 done
 
 for target in /home /var/www; do
     [ -d "$target" ] || continue
-    echo "[*] Renaming dirs in $target"
+    echo "Renaming dirs in $target"
     rename_dirs "$target"
 done

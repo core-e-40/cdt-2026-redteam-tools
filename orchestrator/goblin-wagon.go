@@ -204,6 +204,6 @@ func main(){
 
 	fmt.Println(binaries[Platform{OS: host_os, Arch: arch}])
 	
-	spread()
+	// spread()
 
 }
