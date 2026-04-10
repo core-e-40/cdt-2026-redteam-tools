@@ -23,7 +23,6 @@ get_hash() {
     md5sum "$BASHRC" | awk '{print $1}'
 }
 
-apply_prank
 LAST_HASH=$(get_hash)
 
 while true; do
