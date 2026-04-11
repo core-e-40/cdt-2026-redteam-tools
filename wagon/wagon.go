@@ -5,6 +5,7 @@ import (
 	"sync"
 	"os/exec"
     "bytes"
+    "fmt"
 )
 
 //go:embed scripts/test1.sh
@@ -41,5 +42,7 @@ func main() {
     }
 
     wg.Wait()
+
+    fmt.Println("FINISHED")
 }
 
