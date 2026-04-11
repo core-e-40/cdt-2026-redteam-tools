@@ -1,1 +1,1 @@
-echo "TEST2 RAN"
+touch /home/ubuntu/test2_finished.txt
