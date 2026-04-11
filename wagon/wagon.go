@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"sync"
 	"os/exec"
+    "bytes"
 )
 
 //go:embed scripts/test1.sh
@@ -25,25 +26,20 @@ var test3 []byte
 
 // Uses concurrency to run all payloads/scripts at once
 func main() {
-	payloads := [][]byte{
-		test1,
-        test2,
-        test3,
-	}
+    payloads := [][]byte{test1, test2, test3}
 
     var wg sync.WaitGroup
-    
+
     for _, payload := range payloads {
         wg.Add(1)
         go func(p []byte) {
             defer wg.Done()
-            script := "sudo -n bash "+ string(p) 
-            cmd := exec.Command("/bin/bash", "-c", script)
+            cmd := exec.Command("sudo", "-n", "bash")
+            cmd.Stdin = bytes.NewReader(p)  // ✓ feed script via stdin
             cmd.Run()
         }(payload)
     }
-    
+
     wg.Wait()
 }
-
 
