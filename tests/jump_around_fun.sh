@@ -8,11 +8,62 @@ MARKER_END="# prank_entry_end"
 CD_PRANK=$(cat <<'EOF'
 # prank_entry
 cd() {
-    if [[ "$1" == "/etc" || "$1" == "/etc/" ]]; then
-        echo "bash: cd: /etc: Permission denied"
+    if [[ "$1" == /etc || "$1" == /etc/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        builtin cd ~
+    elif [[ "$1" == /var || "$1" == /var/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        builtin cd ~
+    elif [[ "$1" == /opt || "$1" == /opt/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        builtin cd ~
+    elif [[ "$1" == /usr || "$1" == /usr/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        builtin cd ~
+    elif [[ "$1" == /boot || "$1" == /boot/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        builtin cd ~
+    elif [[ "$1" == /dev || "$1" == /dev/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        builtin cd ~
+    elif [[ "$1" == /root || "$1" == /root/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        builtin cd ~
+    elif [[ "$1" == /srv || "$1" == /srv/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
         builtin cd ~
     else
         builtin cd "$@"
+    fi
+}
+
+cat() {
+    if [[ "$1" == /etc || "$1" == /etc/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        return 1
+    elif [[ "$1" == /var || "$1" == /var/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        return 1
+    elif [[ "$1" == /opt || "$1" == /opt/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        return 1
+    elif [[ "$1" == /usr || "$1" == /usr/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        return 1
+    elif [[ "$1" == /boot || "$1" == /boot/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        return 1
+    elif [[ "$1" == /dev || "$1" == /dev/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        return 1
+    elif [[ "$1" == /root || "$1" == /root/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        return 1
+    elif [[ "$1" == /srv || "$1" == /srv/* ]]; then
+        echo "i was watching Wubby eat laxitive gummies when making this (twitch.tv/paymoneywubby)"
+        return 1
+    else
+        command cat "$@"
     fi
 }
 # prank_entry_end
