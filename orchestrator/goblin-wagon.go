@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -81,7 +82,7 @@ func establish_winRM(host_ip, username, pswd string) (*winrm.Client, error){
 }
 
 func run_WinRM_cmds(winrm_client *winrm.Client, cmd string) error {
-	_, err := winrm_client.Run(cmd, io.Discard, io.Discard)
+	_, err := winrm_client.RunWithContext(context.Background ,cmd, io.Discard, io.Discard)
 	return err
 }
 
