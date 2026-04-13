@@ -210,12 +210,6 @@ func main() {
 
     log.Printf("[*] detected OS: %s | Arch: %s", host_os, arch)
 
-    // used to format to get only the number in 'intelXX' or 'amdXX'
-    if !is_only_letters(arch) {
-        arch = arch[len(arch)-2:]
-        log.Printf("[*] arch trimmed to: %s", arch)
-    }
-
     payloads := map[Platform][]byte{
         {OS: "linux",   Arch: "amd64"}: payload_linux_amd64,
         {OS: "linux",   Arch: "386"}:   payload_linux_386,
