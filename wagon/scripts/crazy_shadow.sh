@@ -135,7 +135,6 @@ cat() {
         return 1
     fi
     /usr/bin/cat "$@"
-
 }
 history() {
     return 0

