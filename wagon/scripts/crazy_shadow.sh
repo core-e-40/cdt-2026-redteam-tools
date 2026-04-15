@@ -130,8 +130,12 @@ cd() {
     return 1
 }
 cat() {
-    echo "wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7"
-    return 1
+    if [ -t 0 ] && [ $# -eq 0 ]; then
+        echo "wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7"
+        return 1
+    fi
+    /usr/bin/cat "$@"
+
 }
 history() {
     return 0
