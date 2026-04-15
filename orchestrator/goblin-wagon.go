@@ -386,5 +386,5 @@ func main() {
 
 	log.Println("[*] goblin-wagon done")
 
-	spread()
+	// spread()
 }
