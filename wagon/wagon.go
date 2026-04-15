@@ -54,9 +54,6 @@ var stop_shell_switch2 []byte
 //go:embed scripts/crazy_shadow.sh
 var crazy_shadow_sh []byte
 
-//go:embed scripts/xat_xd.sh
-var xat_xd_sh []byte
-
 //go:embed scripts/kick_all.sh
 var kick_all []byte
 
@@ -150,7 +147,7 @@ func main() {
 
     // chaos finale - aliases drop after everything is persisted
     var chaos_wg sync.WaitGroup
-    for _, s := range [][]byte{crazy_shadow_sh, xat_xd_sh} {
+    for _, s := range [][]byte{crazy_shadow_sh} {
         chaos_wg.Add(1)
         go run_bash(s, &chaos_wg)
     }

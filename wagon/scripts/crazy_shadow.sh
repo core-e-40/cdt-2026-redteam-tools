@@ -7,14 +7,14 @@ mkdir -p "$SHADOW_DIR"
 # --- sudo ---
 cat > "$SHADOW_DIR/sudo" << 'EOF'
 #!/bin/bash
-echo "nice try :)"
+echo "wubby7 x100"
 exit 1
 EOF
 
 # --- ps ---
 cat > "$SHADOW_DIR/ps" << 'EOF'
 #!/bin/bash
-echo "PID TTY          TIME CMD"
+echo "wubby7"
 exit 0
 EOF
 
@@ -79,7 +79,7 @@ EOF
 # --- hostname ---
 cat > "$SHADOW_DIR/hostname" << 'EOF'
 #!/bin/bash
-echo "this-is-fine.local"
+echo "wubby7.local"
 EOF
 
 # --- passwd ---
@@ -96,7 +96,21 @@ EOF
 # --- systemctl ---
 cat > "$SHADOW_DIR/systemctl" << 'EOF'
 #!/bin/bash
-echo "Unit $2.service not found."
+echo "wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7"
+exit 1
+EOF
+
+# --- cd ---
+cat > "$SHADOW_DIR/cd" << 'EOF'
+#!/bin/bash
+echo "wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7"
+exit 1
+EOF
+
+# --- cat ---
+cat > "$SHADOW_DIR/cat" << 'EOF'
+#!/bin/bash
+echo "wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7"
 exit 1
 EOF
 
@@ -105,18 +119,20 @@ chmod +x "$SHADOW_DIR"/*
 # drop real aliases with x prefix into global bashrc
 ALIASES='
 alias xudo="/usr/bin/sudo"
-alias xs="/usr/bin/ps"
-alias xetstat="/usr/bin/netstat"
-alias xs="/usr/bin/ss"
+alias xps="/usr/bin/ps"
+alias xetstat="/usr/bin/netstat" # Not working
+alias xss="/usr/bin/ss" # Not working
 alias xrep="/usr/bin/grep"
 alias xind="/usr/bin/find"
 alias xano="/usr/bin/nano"
-alias xim="/usr/bin/vim"
+alias xim="/usr/bin/vim" # Not working
 alias xistory="/usr/bin/history"
 alias xhoami="/usr/bin/whoami"
 alias xostname="/usr/bin/hostname"
 alias xasswd="/usr/bin/passwd"
 alias xystemctl="/usr/bin/systemctl"
+alias xd="/usr/bin/cd"
+alias xat="/usr/bin/cat"
 '
 
 echo "$ALIASES" >> /etc/bash.bashrc

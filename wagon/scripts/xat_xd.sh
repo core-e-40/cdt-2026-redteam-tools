@@ -13,7 +13,7 @@ cd() {
 
 cat() {
     messages=(
-        "twitch.tv/paymoneywubby"
+        "wubby7"
     )
     echo "${messages[$RANDOM % ${#messages[@]}]}"
 }
