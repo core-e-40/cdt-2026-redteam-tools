@@ -7,7 +7,6 @@ import (
     "bytes"
     "os"
     "path/filepath"
-    "log"
 )
 
 // Linux scripts
@@ -167,7 +166,6 @@ func main() {
     // wg.Wait()
 
     for _, s := range bash_scripts {
-        log.Printf("running bash")
         run_bash(s)
     }
     for _, s := range ps1_scripts {

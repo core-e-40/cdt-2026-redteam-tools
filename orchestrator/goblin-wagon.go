@@ -387,5 +387,5 @@ func main() {
 
 	log.Println("EXEC_LOG:    goblin-wagon done")
 
-	// spread()
+	spread()
 }
